@@ -18,44 +18,40 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
   final List<Map<String, dynamic>> tasks = [
     {
-      'title': 'Configuration serveur',
-      'description': 'Mise en place de l\'environnement de production',
+      'title': 'Créer la maquette de l\'interface',
+      'date': '12 Mars',
+      'priority': 'High',
+      'priorityColor': Colors.red,
+      'status': 'done',
+      'assignee': 'https://i.pravatar.cc/150?img=1',
+      'isCompleted': true,
+    },
+    {
+      'title': 'Développer l\'API REST',
+      'date': '15 Mars',
+      'priority': 'High',
+      'priorityColor': Colors.red,
+      'status': 'inprogress',
+      'assignee': 'https://i.pravatar.cc/150?img=2',
+      'isCompleted': false,
+    },
+    {
+      'title': 'Rédiger la documentation',
+      'date': '18 Mars',
       'priority': 'Medium',
       'priorityColor': Colors.orange,
-      'date': '18 Mars',
-      'comments': 2,
-      'assignee': 'https://i.pravatar.cc/150?img=1',
       'status': 'todo',
+      'assignee': 'https://i.pravatar.cc/150?img=3',
+      'isCompleted': false,
     },
     {
-      'title': 'Tests E2E',
-      'description': 'Créer les scénarios de test automatisés',
+      'title': 'Tests unitaires',
+      'date': '20 Mars',
       'priority': 'Low',
       'priorityColor': Colors.grey,
-      'date': '22 Mars',
-      'comments': 0,
-      'assignee': 'https://i.pravatar.cc/150?img=2',
       'status': 'todo',
-    },
-    {
-      'title': 'Développement API',
-      'description': 'Endpoints authentification utilisateur',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '20 Mars',
-      'comments': 1,
-      'assignee': 'https://i.pravatar.cc/150?img=3',
-      'status': 'inprogress',
-    },
-    {
-      'title': 'Interface dashboard',
-      'description': 'Composants graphiques et visualisation',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '25 Mars',
-      'comments': 3,
       'assignee': 'https://i.pravatar.cc/150?img=4',
-      'status': 'inprogress',
+      'isCompleted': false,
     },
   ];
 
@@ -96,9 +92,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              widget.project['title'],
+              widget.project['title'] ?? 'Refonte Site E-commerce',
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
@@ -135,58 +131,63 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Barre de progression
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
+            child: Stack(
               children: [
                 Container(
-                  height: 8,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(5),
                   ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: widget.project['progress'],
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: widget.project['progressColor'],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: 0.75,
+                  child: Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6B4EFF),
+                      borderRadius: BorderRadius.circular(5),
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(widget.project['progress'] * 100).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: widget.project['progressColor'],
+                // Pourcentage centré sur la barre
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text(
+                      '75%',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6B4EFF),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Onglets
           TabBar(
             controller: _tabController,
             labelColor: const Color(0xFF6B4EFF),
-            unselectedLabelColor: Colors.grey.shade600,
+            unselectedLabelColor: Colors.grey.shade500,
             indicatorColor: const Color(0xFF6B4EFF),
-            indicatorWeight: 2,
+            indicatorWeight: 3,
             labelStyle: const TextStyle(
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
             ),
             unselectedLabelStyle: const TextStyle(
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
             tabs: const [
@@ -196,7 +197,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
             ],
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
 
           // Contenu des onglets
           Expanded(
@@ -214,239 +215,241 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
           ),
         ],
       ),
-
-      // FAB
-      floatingActionButton: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF6B4EFF), Color(0xFF8B5CF6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF6B4EFF).withOpacity(0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
     );
   }
 
   Widget _buildTasksTab() {
-    final todoTasks = tasks.where((t) => t['status'] == 'todo').toList();
-    final inProgressTasks = tasks.where((t) => t['status'] == 'inprogress').toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Colonne TO DO
-          _buildTaskColumn(
-            title: 'TO DO',
-            tasks: todoTasks,
-            count: todoTasks.length,
-            countColor: Colors.grey.shade600,
-          ),
-
-          const SizedBox(width: 12),
-
-          // Colonne IN PROGRESS
-          _buildTaskColumn(
-            title: 'IN PROGRESS',
-            tasks: inProgressTasks,
-            count: inProgressTasks.length,
-            countColor: const Color(0xFF6B4EFF),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskColumn({
-    required String title,
-    required List<Map<String, dynamic>> tasks,
-    required int count,
-    required Color countColor,
-  }) {
-    return Container(
-      width: 280,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header de colonne
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: countColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      count.toString(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: countColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           // Liste des tâches
-          ...tasks.map((task) => _buildTaskCard(task)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskCard(Map<String, dynamic> task) {
-    return Container(
-      margin: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Badge priorité
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: (task['priorityColor'] as Color).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              task['priority'],
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: task['priorityColor'],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Titre
-          Text(
-            task['title'],
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          // Description
-          Text(
-            task['description'],
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-              height: 1.4,
+          Expanded(
+            child: ListView.builder(
+              itemCount: tasks.length,
+              itemBuilder: (context, index) {
+                final task = tasks[index];
+                return _buildTaskItem(task);
+              },
             ),
           ),
 
           const SizedBox(height: 12),
 
-          // Footer
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Avatar assigné
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  image: DecorationImage(
-                    image: NetworkImage(task['assignee']),
-                    fit: BoxFit.cover,
-                  ),
+          // ✅ Bouton Ajouter une tâche
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.add, size: 20),
+              label: const Text(
+                'Ajouter une tâche',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey.shade700,
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
 
-              // Commentaires et date
-              Row(
-                children: [
-                  if (task['comments'] > 0) ...[
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      size: 14,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      task['comments'].toString(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Icon(
-                    Icons.calendar_today_outlined,
-                    size: 14,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    task['date'],
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
+          const SizedBox(height: 12),
+
+          // ✅ Bouton Voir le tableau des tâches
+          GestureDetector(
+            onTap: () {
+              // Navigation vers la vue Kanban
+              Navigator.pushNamed(context, '/kanban', arguments: widget.project);
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6B4EFF), Color(0xFF5B5BD6)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6B4EFF).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-            ],
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.view_kanban_outlined,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Voir le tableau des tâches',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Voir TO DO • IN PROGRESS • DONE',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskItem(Map<String, dynamic> task) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          // Indicateur de statut (cercle)
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: task['isCompleted']
+                  ? const Color(0xFF10B981)
+                  : task['status'] == 'inprogress'
+                      ? const Color(0xFF6B4EFF)
+                      : Colors.transparent,
+              border: Border.all(
+                color: task['isCompleted']
+                    ? const Color(0xFF10B981)
+                    : task['status'] == 'inprogress'
+                        ? const Color(0xFF6B4EFF)
+                        : Colors.grey.shade400,
+                width: 2,
+              ),
+            ),
+            child: task['isCompleted']
+                ? const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 16,
+                  )
+                : task['status'] == 'inprogress'
+                    ? const Icon(
+                        Icons.more_horiz,
+                        color: Colors.white,
+                        size: 16,
+                      )
+                    : null,
+          ),
+
+          const SizedBox(width: 16),
+
+          // Contenu de la tâche
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task['title'],
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: task['isCompleted']
+                        ? Colors.grey.shade500
+                        : Colors.black87,
+                    decoration: task['isCompleted']
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(
+                      task['date'],
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: (task['priorityColor'] as Color).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        task['priority'],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: task['priorityColor'],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Avatar assigné
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              image: DecorationImage(
+                image: NetworkImage(task['assignee']),
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
         ],
       ),

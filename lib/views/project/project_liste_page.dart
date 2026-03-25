@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:gestiontaches/views/project/project_detail_page.dart';
 import 'package:intl/intl.dart';
 import 'create_project_page.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
-import 'package:gestiontaches/views/project/project_detail_page.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
