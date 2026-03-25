@@ -8,6 +8,7 @@ import 'views/project/dashboard_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'views/project/project_liste_page.dart';
 import 'views/project/create_project_page.dart';
+import 'views/profile/team_member_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +49,7 @@ class MyApp extends StatelessWidget {
         '/dashboard': (context) =>  DashboardPage(),
         '/projects': (context) =>  ProjectsPage(),
         '/createprojects': (context) => CreateProjectPage(),
+        '/team': (context) =>  TeamMembersPage(),
       },
     );
   }
