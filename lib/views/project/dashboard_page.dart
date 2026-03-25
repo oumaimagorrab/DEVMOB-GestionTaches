@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'create_project_page.dart'; 
+import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
 
 class DashboardPage extends StatefulWidget {
   
@@ -27,7 +28,7 @@ class _DashboardPageState extends State<DashboardPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header modifié avec navigation profil
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
@@ -77,17 +78,25 @@ class _DashboardPageState extends State<DashboardPage> {
                     ],
                   ),
                   
-                  // Photo de profil
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      image: const DecorationImage(
-                        image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                        fit: BoxFit.cover,
+                  // ✅ PHOTO DE PROFIL CLIQUABLE
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      );
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: const DecorationImage(
+                          image: NetworkImage('https://i.pravatar.cc/150?img=11'),
+                          fit: BoxFit.cover,
+                        ),
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                      border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
                 ],

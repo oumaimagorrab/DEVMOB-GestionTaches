@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'create_project_page.dart';
+import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -121,16 +122,25 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         ],
                       ),
                       const SizedBox(width: 12),
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: const DecorationImage(
-                            image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                            fit: BoxFit.cover,
+                      // ✅ PHOTO DE PROFIL CLIQUABLE - MODIFIÉ ICI
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ProfilePage()),
+                          );
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: const DecorationImage(
+                              image: NetworkImage('https://i.pravatar.cc/150?img=11'),
+                              fit: BoxFit.cover,
+                            ),
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
-                          border: Border.all(color: Colors.white, width: 2),
                         ),
                       ),
                     ],
@@ -315,7 +325,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
         ),
       ),
       
-      // ✅ FAB MODIFIÉ - Fonctionnel avec GestureDetector
+      // FAB MODIFIÉ - Fonctionnel avec GestureDetector
       floatingActionButton: GestureDetector(
         onTap: () {
           Navigator.push(
