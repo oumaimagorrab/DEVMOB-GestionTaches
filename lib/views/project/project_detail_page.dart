@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestiontaches/views/task/add_task_page.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -241,7 +242,21 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CreateTaskPage(
+                      projectId: widget.project['id'] ?? '1',
+                      onTaskCreated: (newTask) {
+                        setState(() {
+                          tasks.add(newTask);
+                        });
+                      },
+                    ),
+                  ),
+                );
+              },
               icon: const Icon(Icons.add, size: 20),
               label: const Text(
                 'Ajouter une tâche',
