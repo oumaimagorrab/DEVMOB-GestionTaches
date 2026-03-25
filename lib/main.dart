@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-//import 'views/auth/welcome_page.dart';
+import 'views/auth/welcome_page.dart';
 import 'views/auth/login_page.dart';
 import 'views/auth/register_page.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
 
       routes: {
-        //'/': (context) => const WelcomePage(),
+        '/': (context) => const WelcomePage(),
         '/login': (context) => LoginPage(),
         '/register': (context) => RegisterPage(),
         '/dashboard': (context) =>  DashboardPage(),
