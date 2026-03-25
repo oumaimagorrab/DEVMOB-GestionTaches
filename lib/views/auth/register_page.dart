@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 
 class RegisterPage extends StatefulWidget {
@@ -22,6 +24,10 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+
+  // Pour la gestion de l'image
+  File? _profileImage;
+  final ImagePicker _picker = ImagePicker();
   
   // Clé pour le formulaire
   final _formKey = GlobalKey<FormState>();
@@ -33,6 +39,148 @@ class _RegisterPageState extends State<RegisterPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+    // Fonction pour choisir la source de l'image
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _profileImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur lors de la sélection de l\'image')),
+      );
+    }
+  }
+
+  // Afficher le bottom sheet pour choisir caméra ou galerie
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Photo de profil',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choisissez une source pour votre photo',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ListTile(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5B5BD6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.camera_alt, color: Color(0xFF5B5BD6)),
+                  ),
+                  title: const Text('Prendre une photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('Utiliser l\'appareil photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.photo_library, color: Colors.green),
+                  ),
+                  title: const Text('Galerie', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('Choisir depuis vos photos', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                ),
+                if (_profileImage != null) ...[
+                  const SizedBox(height: 12),
+                  ListTile(
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _profileImage = null;
+                      });
+                    },
+                    leading: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.delete_outline, color: Colors.red),
+                    ),
+                    title: const Text('Supprimer', style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text('Retirer la photo actuelle', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                    trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // Fonction d'inscription Firebase
@@ -182,39 +330,75 @@ class _RegisterPageState extends State<RegisterPage> {
                 children: [
                   const SizedBox(height: 20),
                   
-                  // Photo de profil avec caméra
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.person,
-                          size: 50,
-                          color: Colors.grey.shade400,
-                        ),
+                  // 🔵 PHOTO DE PROFIL AVEC CAMÉRA FONCTIONNELLE
+                  Center(
+                    child: GestureDetector(
+                      onTap: _showImageSourceDialog,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          // Container de la photo
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                              // Affiche l'image si sélectionnée, sinon fond gris
+                              image: _profileImage != null
+                                  ? DecorationImage(
+                                      image: FileImage(_profileImage!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                            child: _profileImage == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.grey.shade400,
+                                  )
+                                : null,
+                          ),
+                          
+                          // Bouton caméra cliquable
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF5B5BD6).withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF5B5BD6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  
                   const SizedBox(height: 32),
                   
                   // Champ Nom complet
@@ -469,8 +653,8 @@ class _RegisterPageState extends State<RegisterPage> {
           suffixIcon: IconButton(
             icon: Icon(
               obscureText
-                  ? Icons.visibility_outlined
-                  : Icons.visibility_off_outlined,
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
               color: Colors.grey.shade400,
             ),
             onPressed: onToggle,
