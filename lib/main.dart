@@ -10,6 +10,7 @@ import 'views/project/project_liste_page.dart';
 import 'views/project/create_project_page.dart';
 import 'views/profile/team_member_page.dart';
 import 'views/profile/user_profile_page.dart';
+import 'views/task/task_board_page.dart';
 
 
 void main() async {
@@ -53,6 +54,7 @@ class MyApp extends StatelessWidget {
         '/createprojects': (context) => CreateProjectPage(),
         '/team': (context) =>  TeamMembersPage(),
         '/userprofile': (context) =>  ProfilePage(),
+        '/kanban' : (context) => KanbanBoardPage(),
       },
     );
   }

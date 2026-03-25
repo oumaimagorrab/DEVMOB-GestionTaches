@@ -1,23 +1,20 @@
 import 'package:flutter/material.dart';
 
-class TaskBoard extends StatefulWidget {
-  final Map<String, dynamic> project;
+class KanbanBoardPage extends StatefulWidget {
+  final Map<String, dynamic>? project;
 
-  const TaskBoard({
+  const KanbanBoardPage({
     super.key,
-    required this.project,
+    this.project,
   });
 
   @override
-  State<TaskBoard> createState() => _TaskBoardState();
+  State<KanbanBoardPage> createState() => _KanbanBoardPageState();
 }
 
-class _TaskBoardState extends State<TaskBoard>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _KanbanBoardPageState extends State<KanbanBoardPage> {
   final List<Map<String, dynamic>> tasks = [
-    // TO DO
+    // TO DO (5 tâches)
     {
       'title': 'Configuration serveur',
       'description': 'Mise en place de l\'environnement de production',
@@ -38,7 +35,37 @@ class _TaskBoardState extends State<TaskBoard>
       'assignee': 'https://i.pravatar.cc/150?img=2',
       'status': 'todo',
     },
-    // IN PROGRESS
+    {
+      'title': 'Setup CI/CD',
+      'description': 'Configuration GitHub Actions',
+      'priority': 'High',
+      'priorityColor': Colors.red,
+      'date': '25 Mars',
+      'comments': 1,
+      'assignee': 'https://i.pravatar.cc/150?img=3',
+      'status': 'todo',
+    },
+    {
+      'title': 'Documentation API',
+      'description': 'Rédiger la documentation Swagger',
+      'priority': 'Medium',
+      'priorityColor': Colors.orange,
+      'date': '28 Mars',
+      'comments': 0,
+      'assignee': 'https://i.pravatar.cc/150?img=4',
+      'status': 'todo',
+    },
+    {
+      'title': 'Review code',
+      'description': 'Revue des pull requests',
+      'priority': 'Low',
+      'priorityColor': Colors.grey,
+      'date': '30 Mars',
+      'comments': 3,
+      'assignee': 'https://i.pravatar.cc/150?img=5',
+      'status': 'todo',
+    },
+    // IN PROGRESS (3 tâches)
     {
       'title': 'Développer l\'API REST',
       'description': 'Endpoints pour la gestion des utilisateurs et projets',
@@ -46,7 +73,7 @@ class _TaskBoardState extends State<TaskBoard>
       'priorityColor': Colors.red,
       'date': '15 Mars',
       'comments': 5,
-      'assignee': 'https://i.pravatar.cc/150?img=3',
+      'assignee': 'https://i.pravatar.cc/150?img=6',
       'status': 'inprogress',
     },
     {
@@ -56,10 +83,20 @@ class _TaskBoardState extends State<TaskBoard>
       'priorityColor': Colors.red,
       'date': '16 Mars',
       'comments': 3,
-      'assignee': 'https://i.pravatar.cc/150?img=4',
+      'assignee': 'https://i.pravatar.cc/150?img=7',
       'status': 'inprogress',
     },
-    // DONE
+    {
+      'title': 'Authentification',
+      'description': 'JWT et middleware de sécurité',
+      'priority': 'High',
+      'priorityColor': Colors.red,
+      'date': '20 Mars',
+      'comments': 2,
+      'assignee': 'https://i.pravatar.cc/150?img=8',
+      'status': 'inprogress',
+    },
+    // DONE (8 tâches)
     {
       'title': 'Maquette Figma',
       'description': 'Design system et prototypes interactifs',
@@ -67,7 +104,7 @@ class _TaskBoardState extends State<TaskBoard>
       'priorityColor': Colors.red,
       'date': '10 Mars',
       'comments': 12,
-      'assignee': 'https://i.pravatar.cc/150?img=5',
+      'assignee': 'https://i.pravatar.cc/150?img=9',
       'status': 'done',
     },
     {
@@ -77,311 +114,232 @@ class _TaskBoardState extends State<TaskBoard>
       'priorityColor': Colors.orange,
       'date': '12 Mars',
       'comments': 4,
-      'assignee': 'https://i.pravatar.cc/150?img=6',
+      'assignee': 'https://i.pravatar.cc/150?img=10',
+      'status': 'done',
+    },
+    {
+      'title': 'Analyse besoins',
+      'description': 'Spécifications fonctionnelles',
+      'priority': 'High',
+      'priorityColor': Colors.red,
+      'date': '5 Mars',
+      'comments': 8,
+      'assignee': 'https://i.pravatar.cc/150?img=11',
+      'status': 'done',
+    },
+    {
+      'title': 'Architecture',
+      'description': 'Diagrammes et choix technologiques',
+      'priority': 'Medium',
+      'priorityColor': Colors.orange,
+      'date': '8 Mars',
+      'comments': 2,
+      'assignee': 'https://i.pravatar.cc/150?img=12',
+      'status': 'done',
+    },
+    {
+      'title': 'Setup projet',
+      'description': 'Initialisation repo et structure',
+      'priority': 'Low',
+      'priorityColor': Colors.grey,
+      'date': '1 Mars',
+      'comments': 0,
+      'assignee': 'https://i.pravatar.cc/150?img=13',
+      'status': 'done',
+    },
+    {
+      'title': 'Charte graphique',
+      'description': 'Logo, couleurs et typographie',
+      'priority': 'Medium',
+      'priorityColor': Colors.orange,
+      'date': '3 Mars',
+      'comments': 1,
+      'assignee': 'https://i.pravatar.cc/150?img=14',
+      'status': 'done',
+    },
+    {
+      'title': 'User stories',
+      'description': 'Définition des parcours utilisateurs',
+      'priority': 'High',
+      'priorityColor': Colors.red,
+      'date': '6 Mars',
+      'comments': 5,
+      'assignee': 'https://i.pravatar.cc/150?img=15',
+      'status': 'done',
+    },
+    {
+      'title': 'Benchmark',
+      'description': 'Analyse concurrentielle',
+      'priority': 'Low',
+      'priorityColor': Colors.grey,
+      'date': '2 Mars',
+      'comments': 0,
+      'assignee': 'https://i.pravatar.cc/150?img=16',
       'status': 'done',
     },
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final todoTasks = tasks.where((t) => t['status'] == 'todo').toList();
+    final inProgressTasks = tasks.where((t) => t['status'] == 'inprogress').toList();
+    final doneTasks = tasks.where((t) => t['status'] == 'done').toList();
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        title: Text(
+          widget.project?['title'] ?? 'Refonte E-commerce',
+          style: const TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+            icon: Icon(Icons.filter_list, color: Colors.grey.shade600),
             onPressed: () {},
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Titre du projet
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              widget.project['title'],
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+      // ✅ CORRECTION: SingleChildScrollView pour éviter l'overflow
+      body: SafeArea(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Colonne TO DO
+              _buildKanbanColumn(
+                title: 'TO DO',
+                count: todoTasks.length,
+                countColor: Colors.grey.shade600,
+                columnColor: const Color(0xFFF1F5F9),
+                tasks: todoTasks,
               ),
-            ),
-          ),
 
-          const SizedBox(height: 12),
+              const SizedBox(width: 16),
 
-          // Créé par
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    image: const DecorationImage(
-                      image: NetworkImage('https://i.pravatar.cc/150?img=1'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Créé par Alice Martin',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+              // Colonne IN PROGRESS
+              _buildKanbanColumn(
+                title: 'IN PROGRESS',
+                count: inProgressTasks.length,
+                countColor: const Color(0xFF6366F1),
+                columnColor: const Color(0xFFEEF2FF),
+                tasks: inProgressTasks,
+              ),
 
-          const SizedBox(height: 16),
+              const SizedBox(width: 16),
 
-          // Barre de progression
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              children: [
-                Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: widget.project['progress'],
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: widget.project['progressColor'],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(widget.project['progress'] * 100).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: widget.project['progressColor'],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Onglets
-          TabBar(
-            controller: _tabController,
-            labelColor: const Color(0xFF6B4EFF),
-            unselectedLabelColor: Colors.grey.shade600,
-            indicatorColor: const Color(0xFF6B4EFF),
-            indicatorWeight: 2,
-            labelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-            unselectedLabelStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            tabs: const [
-              Tab(text: 'Tâches'),
-              Tab(text: 'Membres'),
-              Tab(text: 'Infos'),
+              // Colonne DONE
+              _buildKanbanColumn(
+                title: 'DONE',
+                count: doneTasks.length,
+                countColor: const Color(0xFF10B981),
+                columnColor: const Color(0xFFF0FDF4),
+                tasks: doneTasks,
+              ),
             ],
           ),
-
-          const SizedBox(height: 8),
-
-          // Contenu des onglets
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // Onglet Tâches
-                _buildTasksTab(),
-                // Onglet Membres
-                const Center(child: Text('Membres')),
-                // Onglet Infos
-                const Center(child: Text('Infos')),
-              ],
-            ),
-          ),
-        ],
-      ),
-
-      // FAB
-      floatingActionButton: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF6B4EFF), Color(0xFF8B5CF6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF6B4EFF).withOpacity(0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 28,
         ),
       ),
     );
   }
 
-  Widget _buildTasksTab() {
-    final todoTasks = tasks.where((t) => t['status'] == 'todo').toList();
-    final inProgressTasks = tasks.where((t) => t['status'] == 'inprogress').toList();
-    final doneTasks = tasks.where((t) => t['status'] == 'done').toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Colonne TO DO
-          _buildTaskColumn(
-            title: 'TO DO',
-            tasks: todoTasks,
-            count: todoTasks.length,
-            countColor: Colors.grey.shade600,
-            columnColor: const Color(0xFFF1F5F9),
-          ),
-
-          const SizedBox(width: 12),
-
-          // Colonne IN PROGRESS
-          _buildTaskColumn(
-            title: 'IN PROGRESS',
-            tasks: inProgressTasks,
-            count: inProgressTasks.length,
-            countColor: const Color(0xFF6B4EFF),
-            columnColor: const Color(0xFFEEF2FF),
-          ),
-
-          const SizedBox(width: 12),
-
-          // ✅ COLONNE DONE AJOUTÉE
-          _buildTaskColumn(
-            title: 'DONE',
-            tasks: doneTasks,
-            count: doneTasks.length,
-            countColor: Colors.green,
-            columnColor: const Color(0xFFF0FDF4),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTaskColumn({
+  Widget _buildKanbanColumn({
     required String title,
-    required List<Map<String, dynamic>> tasks,
     required int count,
     required Color countColor,
     required Color columnColor,
+    required List<Map<String, dynamic>> tasks,
   }) {
-    return Container(
-      width: 320,
-      decoration: BoxDecoration(
-        color: columnColor,
-        borderRadius: BorderRadius.circular(16),
+    // ✅ CORRECTION: ConstrainedBox pour limiter la hauteur + SingleChildScrollView
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height - 180, // Hauteur max
+        maxWidth: 300,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header de colonne
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                    letterSpacing: 0.5,
+      child: Container(
+        width: 300,
+        decoration: BoxDecoration(
+          color: columnColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: countColor.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      count.toString(),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: countColor,
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: countColor.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        count.toString(),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: countColor,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Liste des tâches
-          ...tasks.map((task) => _buildTaskCard(task)),
-        ],
+            // ✅ CORRECTION: Expanded + SingleChildScrollView pour les tâches
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  children: tasks.map((task) => _buildTaskCard(task)).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
     return Container(
-      margin: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -394,7 +352,7 @@ class _TaskBoardState extends State<TaskBoard>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: (task['priorityColor'] as Color).withOpacity(0.1),
+              color: (task['priorityColor'] as Color).withOpacity(0.12),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
