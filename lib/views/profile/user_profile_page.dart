@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -12,6 +13,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final User? user = FirebaseAuth.instance.currentUser;
+    final String userName = user?.displayName ?? "Utilisateur";
+    final String userEmail = user?.email ?? "email@exemple.com";
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
@@ -88,8 +93,8 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
 
               // Nom
-              const Text(
-                'Jean Dupont',
+              Text(
+                userName,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -101,7 +106,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
               // Email
               Text(
-                'jean.dupont@devmob.com',
+                userEmail,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey.shade600,
