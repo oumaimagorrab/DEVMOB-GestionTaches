@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gestiontaches/views/task/add_task_page.dart';
+import 'package:gestiontaches/services/project_service.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -16,45 +17,7 @@ class ProjectDetailPage extends StatefulWidget {
 class _ProjectDetailPageState extends State<ProjectDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  final List<Map<String, dynamic>> tasks = [
-    {
-      'title': 'Créer la maquette de l\'interface',
-      'date': '12 Mars',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'status': 'done',
-      'assignee': 'https://i.pravatar.cc/150?img=1',
-      'isCompleted': true,
-    },
-    {
-      'title': 'Développer l\'API REST',
-      'date': '15 Mars',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'status': 'inprogress',
-      'assignee': 'https://i.pravatar.cc/150?img=2',
-      'isCompleted': false,
-    },
-    {
-      'title': 'Rédiger la documentation',
-      'date': '18 Mars',
-      'priority': 'Medium',
-      'priorityColor': Colors.orange,
-      'status': 'todo',
-      'assignee': 'https://i.pravatar.cc/150?img=3',
-      'isCompleted': false,
-    },
-    {
-      'title': 'Tests unitaires',
-      'date': '20 Mars',
-      'priority': 'Low',
-      'priorityColor': Colors.grey,
-      'status': 'todo',
-      'assignee': 'https://i.pravatar.cc/150?img=4',
-      'isCompleted': false,
-    },
-  ];
+  final ProjectService _projectService = ProjectService();
 
   @override
   void initState() {
@@ -67,6 +30,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
     _tabController.dispose();
     super.dispose();
   }
+
+  List<Map<String, dynamic>> get tasks => 
+      _projectService.getTasks(widget.project['id'] ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +59,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              widget.project['title'] ?? 'Refonte Site E-commerce',
+              widget.project['title'] ?? 'Projet sans titre',
               style: const TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
@@ -122,7 +88,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Créé par Alice Martin',
+                  'Créé par vous',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -134,44 +100,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 20),
 
-          // Barre de progression
+          // Barre de progression dynamique
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Stack(
-              children: [
-                Container(
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                ),
-                FractionallySizedBox(
-                  widthFactor: 0.75,
-                  child: Container(
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6B4EFF),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                  ),
-                ),
-                // Pourcentage centré sur la barre
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: Text(
-                      '75%',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF6B4EFF),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: _buildProgressBar(),
           ),
 
           const SizedBox(height: 24),
@@ -191,10 +123,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
-            tabs: const [
-              Tab(text: 'Tâches'),
-              Tab(text: 'Membres'),
-              Tab(text: 'Infos'),
+            tabs: [
+              Tab(text: 'Tâches (${tasks.length})'),
+              const Tab(text: 'Membres'),
+              const Tab(text: 'Infos'),
             ],
           ),
 
@@ -219,43 +151,112 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
     );
   }
 
+  Widget _buildProgressBar() {
+    final total = tasks.length;
+    final completed = tasks.where((t) => t['isCompleted'] == true).length;
+    final progress = total > 0 ? completed / total : 0.0;
+
+    return Column(
+      children: [
+        Stack(
+          children: [
+            Container(
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(5),
+              ),
+            ),
+            FractionallySizedBox(
+              widthFactor: progress,
+              child: Container(
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B4EFF),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '${(progress * 100).toInt()}% (${completed}/${total})',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF6B4EFF),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTasksTab() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          // Liste des tâches
+          // Liste des tâches dynamique
           Expanded(
-            child: ListView.builder(
-              itemCount: tasks.length,
-              itemBuilder: (context, index) {
-                final task = tasks[index];
-                return _buildTaskItem(task);
-              },
-            ),
+            child: tasks.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.task_alt,
+                          size: 64,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Aucune tâche',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: tasks.length,
+                    itemBuilder: (context, index) {
+                      final task = tasks[index];
+                      return _buildTaskItem(task, index);
+                    },
+                  ),
           ),
 
           const SizedBox(height: 12),
 
-          // ✅ Bouton Ajouter une tâche
+          // Bouton Ajouter une tâche
           SizedBox(
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: () {
-                                Navigator.push(
+              onPressed: () async {
+                final newTask = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => CreateTaskPage(
-                      projectId: widget.project['id'] ?? '1',
-                      onTaskCreated: (newTask) {
-                        setState(() {
-                          tasks.add(newTask);
-                        });
-                      },
+                      projectId: widget.project['id'] ?? '',
                     ),
                   ),
                 );
+                
+                if (mounted && newTask != null) {
+                  setState(() {
+                    _projectService.addTask(
+                      widget.project['id'] ?? '', 
+                      newTask,
+                    );
+                  });
+                }
               },
               icon: const Icon(Icons.add, size: 20),
               label: const Text(
@@ -277,11 +278,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 12),
 
-          // ✅ Bouton Voir le tableau des tâches
+          // Bouton Voir le tableau des tâches
           GestureDetector(
             onTap: () {
-              // Navigation vers la vue Kanban
-              Navigator.pushNamed(context, '/kanban', arguments: widget.project);
+              Navigator.pushNamed(
+                context, 
+                '/kanban', 
+                arguments: widget.project,
+              );
             },
             child: Container(
               width: double.infinity,
@@ -354,119 +358,135 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
     );
   }
 
-  Widget _buildTaskItem(Map<String, dynamic> task) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
+  Widget _buildTaskItem(Map<String, dynamic> task, int index) {
+    return Dismissible(
+      key: Key('task_${task['title']}_$index'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
-      child: Row(
-        children: [
-          // Indicateur de statut (cercle)
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: task['isCompleted']
-                  ? const Color(0xFF10B981)
-                  : task['status'] == 'inprogress'
-                      ? const Color(0xFF6B4EFF)
+      onDismissed: (_) {
+        setState(() {
+          tasks.removeAt(index);
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            // Checkbox interactive
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  task['isCompleted'] = !(task['isCompleted'] ?? false);
+                });
+              },
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: (task['isCompleted'] ?? false)
+                      ? const Color(0xFF10B981)
                       : Colors.transparent,
-              border: Border.all(
-                color: task['isCompleted']
-                    ? const Color(0xFF10B981)
-                    : task['status'] == 'inprogress'
-                        ? const Color(0xFF6B4EFF)
+                  border: Border.all(
+                    color: (task['isCompleted'] ?? false)
+                        ? const Color(0xFF10B981)
                         : Colors.grey.shade400,
-                width: 2,
-              ),
-            ),
-            child: task['isCompleted']
-                ? const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 16,
-                  )
-                : task['status'] == 'inprogress'
+                    width: 2,
+                  ),
+                ),
+                child: (task['isCompleted'] ?? false)
                     ? const Icon(
-                        Icons.more_horiz,
+                        Icons.check,
                         color: Colors.white,
                         size: 16,
                       )
                     : null,
-          ),
-
-          const SizedBox(width: 16),
-
-          // Contenu de la tâche
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task['title'],
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: task['isCompleted']
-                        ? Colors.grey.shade500
-                        : Colors.black87,
-                    decoration: task['isCompleted']
-                        ? TextDecoration.lineThrough
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text(
-                      task['date'],
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: (task['priorityColor'] as Color).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        task['priority'],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: task['priorityColor'],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Avatar assigné
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              image: DecorationImage(
-                image: NetworkImage(task['assignee']),
-                fit: BoxFit.cover,
               ),
             ),
-          ),
-        ],
+
+            const SizedBox(width: 16),
+
+            // Contenu de la tâche
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task['title'],
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: (task['isCompleted'] ?? false)
+                          ? Colors.grey.shade500
+                          : Colors.black87,
+                      decoration: (task['isCompleted'] ?? false)
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        task['date'] ?? '',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (task['priorityColor'] as Color?)?.withOpacity(0.1) ?? 
+                                 Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          task['priority'] ?? 'Medium',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: task['priorityColor'] ?? Colors.orange,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Avatar assigné
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                image: DecorationImage(
+                  image: NetworkImage(task['assignee'] ?? 'https://i.pravatar.cc/150?img=11'),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

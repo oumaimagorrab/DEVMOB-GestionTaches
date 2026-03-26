@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestiontaches/services/project_service.dart';
 
 class KanbanBoardPage extends StatefulWidget {
   final Map<String, dynamic>? project;
@@ -13,177 +14,16 @@ class KanbanBoardPage extends StatefulWidget {
 }
 
 class _KanbanBoardPageState extends State<KanbanBoardPage> {
-  final List<Map<String, dynamic>> tasks = [
-    // TO DO (5 tâches)
-    {
-      'title': 'Configuration serveur',
-      'description': 'Mise en place de l\'environnement de production',
-      'priority': 'Medium',
-      'priorityColor': Colors.orange,
-      'date': '18 Mars',
-      'comments': 2,
-      'assignee': 'https://i.pravatar.cc/150?img=1',
-      'status': 'todo',
-    },
-    {
-      'title': 'Tests E2E',
-      'description': 'Créer les scénarios de test automatisés',
-      'priority': 'Low',
-      'priorityColor': Colors.grey,
-      'date': '22 Mars',
-      'comments': 0,
-      'assignee': 'https://i.pravatar.cc/150?img=2',
-      'status': 'todo',
-    },
-    {
-      'title': 'Setup CI/CD',
-      'description': 'Configuration GitHub Actions',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '25 Mars',
-      'comments': 1,
-      'assignee': 'https://i.pravatar.cc/150?img=3',
-      'status': 'todo',
-    },
-    {
-      'title': 'Documentation API',
-      'description': 'Rédiger la documentation Swagger',
-      'priority': 'Medium',
-      'priorityColor': Colors.orange,
-      'date': '28 Mars',
-      'comments': 0,
-      'assignee': 'https://i.pravatar.cc/150?img=4',
-      'status': 'todo',
-    },
-    {
-      'title': 'Review code',
-      'description': 'Revue des pull requests',
-      'priority': 'Low',
-      'priorityColor': Colors.grey,
-      'date': '30 Mars',
-      'comments': 3,
-      'assignee': 'https://i.pravatar.cc/150?img=5',
-      'status': 'todo',
-    },
-    // IN PROGRESS (3 tâches)
-    {
-      'title': 'Développer l\'API REST',
-      'description': 'Endpoints pour la gestion des utilisateurs et projets',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '15 Mars',
-      'comments': 5,
-      'assignee': 'https://i.pravatar.cc/150?img=6',
-      'status': 'inprogress',
-    },
-    {
-      'title': 'Interface utilisateur',
-      'description': 'Composants React pour le dashboard',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '16 Mars',
-      'comments': 3,
-      'assignee': 'https://i.pravatar.cc/150?img=7',
-      'status': 'inprogress',
-    },
-    {
-      'title': 'Authentification',
-      'description': 'JWT et middleware de sécurité',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '20 Mars',
-      'comments': 2,
-      'assignee': 'https://i.pravatar.cc/150?img=8',
-      'status': 'inprogress',
-    },
-    // DONE (8 tâches)
-    {
-      'title': 'Maquette Figma',
-      'description': 'Design system et prototypes interactifs',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '10 Mars',
-      'comments': 12,
-      'assignee': 'https://i.pravatar.cc/150?img=9',
-      'status': 'done',
-    },
-    {
-      'title': 'Base de données',
-      'description': 'Schéma et migrations Supabase',
-      'priority': 'Medium',
-      'priorityColor': Colors.orange,
-      'date': '12 Mars',
-      'comments': 4,
-      'assignee': 'https://i.pravatar.cc/150?img=10',
-      'status': 'done',
-    },
-    {
-      'title': 'Analyse besoins',
-      'description': 'Spécifications fonctionnelles',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '5 Mars',
-      'comments': 8,
-      'assignee': 'https://i.pravatar.cc/150?img=11',
-      'status': 'done',
-    },
-    {
-      'title': 'Architecture',
-      'description': 'Diagrammes et choix technologiques',
-      'priority': 'Medium',
-      'priorityColor': Colors.orange,
-      'date': '8 Mars',
-      'comments': 2,
-      'assignee': 'https://i.pravatar.cc/150?img=12',
-      'status': 'done',
-    },
-    {
-      'title': 'Setup projet',
-      'description': 'Initialisation repo et structure',
-      'priority': 'Low',
-      'priorityColor': Colors.grey,
-      'date': '1 Mars',
-      'comments': 0,
-      'assignee': 'https://i.pravatar.cc/150?img=13',
-      'status': 'done',
-    },
-    {
-      'title': 'Charte graphique',
-      'description': 'Logo, couleurs et typographie',
-      'priority': 'Medium',
-      'priorityColor': Colors.orange,
-      'date': '3 Mars',
-      'comments': 1,
-      'assignee': 'https://i.pravatar.cc/150?img=14',
-      'status': 'done',
-    },
-    {
-      'title': 'User stories',
-      'description': 'Définition des parcours utilisateurs',
-      'priority': 'High',
-      'priorityColor': Colors.red,
-      'date': '6 Mars',
-      'comments': 5,
-      'assignee': 'https://i.pravatar.cc/150?img=15',
-      'status': 'done',
-    },
-    {
-      'title': 'Benchmark',
-      'description': 'Analyse concurrentielle',
-      'priority': 'Low',
-      'priorityColor': Colors.grey,
-      'date': '2 Mars',
-      'comments': 0,
-      'assignee': 'https://i.pravatar.cc/150?img=16',
-      'status': 'done',
-    },
-  ];
+  final ProjectService _projectService = ProjectService();
+
+  List<Map<String, dynamic>> get tasks => 
+      _projectService.getTasks(widget.project?['id'] ?? '');
 
   @override
   Widget build(BuildContext context) {
     final todoTasks = tasks.where((t) => t['status'] == 'todo').toList();
     final inProgressTasks = tasks.where((t) => t['status'] == 'inprogress').toList();
-    final doneTasks = tasks.where((t) => t['status'] == 'done').toList();
+    final doneTasks = tasks.where((t) => t['isCompleted'] == true || t['status'] == 'done').toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -191,7 +31,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          widget.project?['title'] ?? 'Refonte E-commerce',
+          widget.project?['title'] ?? 'Tableau Kanban',
           style: const TextStyle(
             color: Colors.black87,
             fontSize: 18,
@@ -203,14 +43,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.filter_list, color: Colors.grey.shade600),
-            onPressed: () {},
-          ),
-        ],
       ),
-      // ✅ CORRECTION: SingleChildScrollView pour éviter l'overflow
       body: SafeArea(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -218,7 +51,6 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Colonne TO DO
               _buildKanbanColumn(
                 title: 'TO DO',
                 count: todoTasks.length,
@@ -226,10 +58,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                 columnColor: const Color(0xFFF1F5F9),
                 tasks: todoTasks,
               ),
-
               const SizedBox(width: 16),
-
-              // Colonne IN PROGRESS
               _buildKanbanColumn(
                 title: 'IN PROGRESS',
                 count: inProgressTasks.length,
@@ -237,10 +66,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                 columnColor: const Color(0xFFEEF2FF),
                 tasks: inProgressTasks,
               ),
-
               const SizedBox(width: 16),
-
-              // Colonne DONE
               _buildKanbanColumn(
                 title: 'DONE',
                 count: doneTasks.length,
@@ -262,10 +88,9 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
     required Color columnColor,
     required List<Map<String, dynamic>> tasks,
   }) {
-    // ✅ CORRECTION: ConstrainedBox pour limiter la hauteur + SingleChildScrollView
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height - 180, // Hauteur max
+        maxHeight: MediaQuery.of(context).size.height - 180,
         maxWidth: 300,
       ),
       child: Container(
@@ -278,7 +103,6 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -314,15 +138,23 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                 ],
               ),
             ),
-
-            // ✅ CORRECTION: Expanded + SingleChildScrollView pour les tâches
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Column(
-                  children: tasks.map((task) => _buildTaskCard(task)).toList(),
-                ),
-              ),
+              child: tasks.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Aucune tâche',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Column(
+                        children: tasks.map((task) => _buildTaskCard(task)).toList(),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -348,70 +180,60 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Badge priorité
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: (task['priorityColor'] as Color).withOpacity(0.12),
+              color: (task['priorityColor'] as Color?)?.withOpacity(0.12) ??
+                     Colors.orange.withOpacity(0.12),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              task['priority'],
+              task['priority'] ?? 'Medium',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: task['priorityColor'],
+                color: task['priorityColor'] ?? Colors.orange,
               ),
             ),
           ),
-
           const SizedBox(height: 10),
-
-          // Titre
           Text(
-            task['title'],
+            task['title'] ?? '',
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
           ),
-
-          const SizedBox(height: 6),
-
-          // Description
-          Text(
-            task['description'],
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-              height: 1.4,
+          if (task['description']?.isNotEmpty ?? false) ...[
+            const SizedBox(height: 6),
+            Text(
+              task['description'],
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
             ),
-          ),
-
+          ],
           const SizedBox(height: 12),
-
-          // Footer
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Avatar assigné
               Container(
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   image: DecorationImage(
-                    image: NetworkImage(task['assignee']),
+                    image: NetworkImage(task['assignee'] ?? 'https://i.pravatar.cc/150?img=11'),
                     fit: BoxFit.cover,
                   ),
                 ),
               ),
-
-              // Commentaires et date
               Row(
                 children: [
-                  if (task['comments'] > 0) ...[
+                  if ((task['comments'] ?? 0) > 0) ...[
                     Icon(
                       Icons.chat_bubble_outline,
                       size: 14,
@@ -434,7 +256,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    task['date'],
+                    task['date'] ?? '',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade500,

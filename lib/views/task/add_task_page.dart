@@ -3,12 +3,10 @@ import 'package:intl/intl.dart';
 
 class CreateTaskPage extends StatefulWidget {
   final String projectId;
-  final Function(Map<String, dynamic>)? onTaskCreated;
 
   const CreateTaskPage({
     super.key,
     required this.projectId,
-    this.onTaskCreated,
   });
 
   @override
@@ -20,8 +18,8 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
   final _descriptionController = TextEditingController();
   
   DateTime? _selectedDate;
-  String _selectedPriority = '';
-  String _selectedAssignee = 'Bob Durand';
+  String _selectedPriority = 'Medium';
+  String _selectedAssignee = '';
   bool _notifyOnComplete = false;
 
   final List<Map<String, dynamic>> assignees = [
@@ -32,10 +30,18 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
 
   final List<String> priorities = ['Low', 'Medium', 'High'];
 
-  final List<Map<String, dynamic>> attachments = [
-    {'name': 'design-mockup.fig', 'size': '2.4 MB', 'icon': Icons.insert_drive_file},
-    {'name': 'requirements.pdf', 'size': '1.1 MB', 'icon': Icons.picture_as_pdf},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _selectedAssignee = assignees.first['name'];
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -70,21 +76,39 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
       return;
     }
 
+    final assigneeData = assignees.firstWhere(
+      (a) => a['name'] == _selectedAssignee,
+      orElse: () => assignees.first,
+    );
+
     final newTask = {
       'title': _titleController.text,
       'description': _descriptionController.text,
-      'priority': _selectedPriority.isEmpty ? 'Medium' : _selectedPriority,
+      'priority': _selectedPriority,
       'priorityColor': _getPriorityColor(_selectedPriority),
       'date': _selectedDate != null 
           ? DateFormat('d MMM').format(_selectedDate!)
-          : '${DateTime.now().day} ${_getMonth(DateTime.now().month)}',
+          : DateFormat('d MMM').format(DateTime.now()),
       'comments': 0,
-      'assignee': assignees.firstWhere((a) => a['name'] == _selectedAssignee)['image'],
+      'assignee': assigneeData['image'],
+      'assigneeName': assigneeData['name'],
       'status': 'todo',
+      'isCompleted': false,
+      'createdAt': DateTime.now().toIso8601String(),
+      'notifyOnComplete': _notifyOnComplete, // ✅ UTILISÉ ICI
     };
 
-    widget.onTaskCreated?.call(newTask);
-    Navigator.pop(context);
+    // Afficher confirmation si notification activée
+    if (_notifyOnComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous serez notifié lorsque la tâche sera terminée'),
+          backgroundColor: Color(0xFF6B4EFF),
+        ),
+      );
+    }
+
+    Navigator.pop(context, newTask);
   }
 
   Color _getPriorityColor(String priority) {
@@ -98,11 +122,6 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
       default:
         return Colors.orange;
     }
-  }
-
-  String _getMonth(int month) {
-    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-    return months[month - 1];
   }
 
   @override
@@ -265,7 +284,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
                               Text(
                                 _selectedDate != null
                                     ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
-                                    : '',
+                                    : 'Sélectionner',
                                 style: TextStyle(
                                   fontSize: 15,
                                   color: _selectedDate != null
@@ -310,12 +329,8 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: _selectedPriority.isEmpty ? null : _selectedPriority,
+                            value: _selectedPriority,
                             isExpanded: true,
-                            hint: Text(
-                              '',
-                              style: TextStyle(color: Colors.grey.shade400),
-                            ),
                             icon: Icon(Icons.keyboard_arrow_down, color: Colors.grey.shade600),
                             items: priorities.map((priority) {
                               return DropdownMenuItem<String>(
@@ -345,86 +360,73 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
 
             const SizedBox(height: 24),
 
-            // Pièces jointes
-            const Text(
-              'Pièces jointes',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Zone de drop
+            // ✅ NOTIFICATION TOGGLE - Maintenant utilisé
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 32),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                  style: BorderStyle.solid,
-                ),
+                color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
               ),
-              child: Column(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    Icons.cloud_upload_outlined,
-                    color: Colors.grey.shade500,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Cliquer ou déposer des fichiers',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.notifications_active_outlined,
+                              size: 20,
+                              color: _notifyOnComplete 
+                                  ? const Color(0xFF6B4EFF) 
+                                  : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Me notifier quand cette tâche est terminée',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: _notifyOnComplete 
+                                      ? Colors.black87 
+                                      : Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_notifyOnComplete) ...[
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 32),
+                            child: Text(
+                              'Notification activée',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: const Color(0xFF6B4EFF),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'PDF, images, jusqu\'à 10MB',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
+                  Switch(
+                    value: _notifyOnComplete,
+                    onChanged: (value) {
+                      setState(() {
+                        _notifyOnComplete = value;
+                      });
+                    },
+                    activeColor: const Color(0xFF6B4EFF),
+                    activeTrackColor: const Color(0xFF6B4EFF).withOpacity(0.3),
                   ),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Liste des fichiers joints
-            ...attachments.map((file) => _buildAttachmentItem(file)),
-
-            const SizedBox(height: 24),
-
-            // Notification toggle
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    'Me notifier quand cette tâche est terminée',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                ),
-                Switch(
-                  value: _notifyOnComplete,
-                  onChanged: (value) {
-                    setState(() {
-                      _notifyOnComplete = value;
-                    });
-                  },
-                  activeColor: const Color(0xFF6B4EFF),
-                ),
-              ],
             ),
           ],
         ),
@@ -459,55 +461,6 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
           horizontal: 16,
           vertical: 16,
         ),
-      ),
-    );
-  }
-
-  Widget _buildAttachmentItem(Map<String, dynamic> file) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            file['icon'] as IconData,
-            color: Colors.grey.shade600,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file['name'],
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-                Text(
-                  file['size'],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.close, color: Colors.grey.shade500, size: 20),
-            onPressed: () {},
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ],
       ),
     );
   }
