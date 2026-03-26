@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:gestiontaches/services/project_service.dart';
+import 'package:gestiontaches/models/user.dart';
 
 class CreateProjectPage extends StatefulWidget {
   const CreateProjectPage({super.key});
@@ -16,21 +18,50 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
   DateTime? _selectedDate;
   int _selectedColorIndex = 0;
   int _descriptionLength = 0;
+  bool _isInviting = false;
 
   final List<Color> projectColors = [
-    const Color(0xFF5B5BD6), // Violet
-    const Color(0xFFA855F7), // Violet clair
-    const Color(0xFF10B981), // Vert
-    const Color(0xFFF59E0B), // Orange
-    const Color(0xFFEF4444), // Rouge
-    const Color(0xFF3B82F6), // Bleu
+    const Color(0xFF5B5BD6),
+    const Color(0xFFA855F7),
+    const Color(0xFF10B981),
+    const Color(0xFFF59E0B),
+    const Color(0xFFEF4444),
+    const Color(0xFF3B82F6),
   ];
 
-  final List<Map<String, dynamic>> recentMembers = [
-    {'name': 'Alice', 'image': 'https://i.pravatar.cc/150?img=1'},
-    {'name': 'Bob', 'image': 'https://i.pravatar.cc/150?img=2'},
-    {'name': 'Claire', 'image': 'https://i.pravatar.cc/150?img=3'},
-  ];
+  // Base de données simulée des utilisateurs enregistrés
+  final Map<String, Member> registeredUsers = {
+    'alice@example.com': Member(
+      name: 'Alice Martin',
+      email: 'alice@example.com',
+      image: 'https://i.pravatar.cc/150?img=1',
+      isRegistered: true,
+    ),
+    'bob@example.com': Member(
+      name: 'Bob Durand',
+      email: 'bob@example.com',
+      image: 'https://i.pravatar.cc/150?img=2',
+      isRegistered: true,
+    ),
+    'claire@example.com': Member(
+      name: 'Claire Petit',
+      email: 'claire@example.com',
+      image: 'https://i.pravatar.cc/150?img=3',
+      isRegistered: true,
+    ),
+    'david@example.com': Member(
+      name: 'David Bernard',
+      email: 'david@example.com',
+      image: 'https://i.pravatar.cc/150?img=4',
+      isRegistered: true,
+    ),
+  };
+
+  // Membres récents pour l'affichage rapide
+  final List<Member> recentMembers = [];
+
+  // Membres invités au projet
+  List<Member> invitedMembers = [];
 
   @override
   void initState() {
@@ -40,6 +71,8 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         _descriptionLength = _descriptionController.text.length;
       });
     });
+    // Initialiser les membres récents
+    recentMembers.addAll(registeredUsers.values.take(3));
   }
 
   @override
@@ -75,17 +108,115 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     }
   }
 
+  // Valider le format de l'email
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  // Inviter un membre par email
+  Future<void> _inviteMember() async {
+    final email = _emailController.text.trim().toLowerCase();
+    
+    if (email.isEmpty) {
+      _showSnackBar('Veuillez entrer un email');
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      _showSnackBar('Format d\'email invalide');
+      return;
+    }
+
+    // Vérifier si déjà invité
+    if (invitedMembers.any((m) => m.email == email)) {
+      _showSnackBar('Cet utilisateur est déjà invité');
+      return;
+    }
+
+    setState(() {
+      _isInviting = true;
+    });
+
+    // Simuler un appel API
+    await Future.delayed(const Duration(seconds: 1));
+
+    Member? member;
+    bool isNewUser = false;
+
+    // Vérifier si l'utilisateur existe dans la base
+    if (registeredUsers.containsKey(email)) {
+      member = registeredUsers[email]!;
+    } else {
+      // Créer un nouvel utilisateur non enregistré
+      isNewUser = true;
+      member = Member(
+        name: email.split('@')[0], // Utiliser la partie avant @ comme nom temporaire
+        email: email,
+        image: 'https://i.pravatar.cc/150?img=${email.hashCode % 70}',
+        isRegistered: false,
+      );
+    }
+
+    setState(() {
+      invitedMembers.add(member!);
+      _emailController.clear();
+      _isInviting = false;
+    });
+
+    // Afficher le message approprié
+    if (isNewUser) {
+      _showSnackBar('Invitation envoyée à $email', isSuccess: true);
+      // Ici vous pouvez intégrer un vrai service d'email
+      _sendEmailInvitation(email);
+    } else {
+      _showSnackBar('${member.name} a été ajouté au projet', isSuccess: true);
+    }
+  }
+
+  // Simuler l'envoi d'email
+  void _sendEmailInvitation(String email) {
+    print('📧 Envoi d\'invitation à: $email');
+    print('📧 Sujet: Invitation à rejoindre le projet "${_nameController.text}"');
+    print('📧 Contenu: Vous êtes invité à rejoindre le projet...');
+    // Intégration possible avec: SendGrid, Firebase, EmailJS, etc.
+  }
+
+  void _showSnackBar(String message, {bool isSuccess = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isSuccess ? const Color(0xFF10B981) : Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
   void _createProject() {
     if (_nameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer un nom de projet')),
-      );
+      _showSnackBar('Veuillez entrer un nom de projet');
       return;
     }
     
-    // Créer le projet
-    print('Projet créé: ${_nameController.text}');
-    Navigator.pop(context);
+    final newProject = {
+      'title': _nameController.text,
+      'description': _descriptionController.text.isEmpty 
+          ? 'Aucune description' 
+          : _descriptionController.text,
+      'progress': 0.0,
+      'progressColor': projectColors[_selectedColorIndex],
+      'date': _selectedDate,
+      'members': invitedMembers.isEmpty 
+          ? ['https://i.pravatar.cc/150?img=11']
+          : invitedMembers.map((m) => m.image).toList(),
+      'memberDetails': invitedMembers.map((m) => m.toMap()).toList(),
+      'topBorderColor': projectColors[_selectedColorIndex],
+    };
+    
+    ProjectService().addProject(newProject);
+    Navigator.pop(context, true);
   }
 
   @override
@@ -182,7 +313,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
               maxLines: 4,
               maxLength: 500,
               buildCounter: (context, {required currentLength, required isFocused, maxLength}) {
-                return null; // Cache le compteur par défaut
+                return null;
               },
               decoration: InputDecoration(
                 hintText: 'Description',
@@ -205,7 +336,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
               ),
             ),
             
-            // Compteur personnalisé
             Align(
               alignment: Alignment.centerRight,
               child: Text(
@@ -234,7 +364,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                     Text(
                       _selectedDate != null
                           ? dateFormat.format(_selectedDate!)
-                          : '',
+                          : 'Date d\'échéance',
                       style: TextStyle(
                         color: _selectedDate != null
                             ? Colors.black87
@@ -266,7 +396,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
             
             const SizedBox(height: 12),
             
-            // Sélecteur de couleurs
             Row(
               children: List.generate(projectColors.length, (index) {
                 final isSelected = _selectedColorIndex == index;
@@ -321,12 +450,110 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
             
             const SizedBox(height: 16),
             
+            // Liste des membres déjà invités
+            if (invitedMembers.isNotEmpty) ...[
+              SizedBox(
+                height: 80,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: invitedMembers.length,
+                  itemBuilder: (context, index) {
+                    final member = invitedMembers[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFF6B4EFF),
+                                    width: 2,
+                                  ),
+                                  image: DecorationImage(
+                                    image: NetworkImage(member.image),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              if (!member.isRegistered)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.mail_outline,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              Positioned(
+                                right: -4,
+                                top: -4,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      invitedMembers.removeAt(index);
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            member.name.split(' ')[0],
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (!member.isRegistered)
+                            Text(
+                              'En attente',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.orange[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            
             // Ajouter par email
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       hintText: 'Ajouter par email',
                       hintStyle: TextStyle(color: Colors.grey.shade500),
@@ -353,13 +580,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () {
-                    // Inviter membre
-                    if (_emailController.text.isNotEmpty) {
-                      print('Invitation envoyée à: ${_emailController.text}');
-                      _emailController.clear();
-                    }
-                  },
+                  onPressed: _isInviting ? null : _inviteMember,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6B4EFF),
                     foregroundColor: Colors.white,
@@ -372,61 +593,72 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Inviter',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isInviting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Inviter',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ],
             ),
             
             const SizedBox(height: 24),
             
-            // Membres récents
-            const Text(
-              'Membres récents',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
+            // Membres suggérés (enregistrés)
+            if (recentMembers.isNotEmpty) ...[
+              const Text(
+                'Suggestions',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Liste des membres récents
-            Row(
-              children: recentMembers.map((member) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(
-                            image: NetworkImage(member['image']),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+              
+              const SizedBox(height: 12),
+              
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: recentMembers.where((m) => 
+                  !invitedMembers.any((invited) => invited.email == m.email)
+                ).map((member) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        invitedMembers.add(member);
+                      });
+                      _showSnackBar('${member.name} ajouté', isSuccess: true);
+                    },
+                    child: Chip(
+                      avatar: CircleAvatar(
+                        backgroundImage: NetworkImage(member.image),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        member['name'],
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
+                      label: Text(member.name),
+                      backgroundColor: Colors.grey.shade100,
+                      deleteIcon: const Icon(Icons.add, size: 18),
+                      onDeleted: () {
+                        setState(() {
+                          invitedMembers.add(member);
+                        });
+                        _showSnackBar('${member.name} ajouté', isSuccess: true);
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
       ),

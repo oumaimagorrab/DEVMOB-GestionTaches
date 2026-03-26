@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:gestiontaches/views/project/project_detail_page.dart';
 import 'package:intl/intl.dart';
 import 'create_project_page.dart';
-import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
+import 'package:gestiontaches/views/profile/user_profile_page.dart';
+import 'package:gestiontaches/services/project_service.dart'; 
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -13,47 +14,9 @@ class ProjectsPage extends StatefulWidget {
 
 class _ProjectsPageState extends State<ProjectsPage> {
   int _selectedIndex = 1;
+  final ProjectService _projectService = ProjectService();
 
-  final List<Map<String, dynamic>> projects = [
-    {
-      'title': 'Refonte Site E-commerce',
-      'description': 'Migration complète vers React et optimisation des performances',
-      'progress': 0.75,
-      'progressColor': const Color(0xFF6B4EFF),
-      'date': DateTime(2026, 3, 15),
-      'members': [
-        'https://i.pravatar.cc/150?img=1',
-        'https://i.pravatar.cc/150?img=2',
-        'https://i.pravatar.cc/150?img=3',
-      ],
-      'topBorderColor': const Color(0xFF6B4EFF),
-    },
-    {
-      'title': 'Application Mobile Banking',
-      'description': 'Développement de l\'app iOS et Android avec React Native',
-      'progress': 0.45,
-      'progressColor': const Color(0xFF10B981),
-      'date': DateTime(2026, 3, 28),
-      'members': [
-        'https://i.pravatar.cc/150?img=4',
-        'https://i.pravatar.cc/150?img=5',
-      ],
-      'topBorderColor': const Color(0xFF10B981),
-    },
-    {
-      'title': 'Dashboard Analytics',
-      'description': 'Interface de visualisation de données en temps réel',
-      'progress': 0.90,
-      'progressColor': const Color(0xFFF59E0B),
-      'date': DateTime(2026, 3, 10),
-      'members': [
-        'https://i.pravatar.cc/150?img=6',
-        'https://i.pravatar.cc/150?img=7',
-        'https://i.pravatar.cc/150?img=8',
-      ],
-      'topBorderColor': const Color(0xFFF59E0B),
-    },
-  ];
+  List<Map<String, dynamic>> get projects => _projectService.projects;
 
   @override
   Widget build(BuildContext context) {
@@ -151,191 +114,221 @@ class _ProjectsPageState extends State<ProjectsPage> {
             
             // Liste des projets
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                itemCount: projects.length,
-                itemBuilder: (context, index) {
-                  final project = projects[index];
-                  final members = project['members'] as List<String>;
-                  
-                  // ✅ PROJET CLIQUABLE - GestureDetector ajouté
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProjectDetailPage(
-                            project: project,
+              child: projects.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.folder_open_outlined,
+                            size: 64,
+                            color: Colors.grey.shade400,
                           ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Aucun projet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Créez votre premier projet',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Bordure colorée en haut
-                          Container(
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: project['topBorderColor'],
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(20),
-                                topRight: Radius.circular(20),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      itemCount: projects.length,
+                      itemBuilder: (context, index) {
+                        final project = projects[index];
+                        final members = project['members'] as List<String>? ?? [];
+                        
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProjectDetailPage(
+                                  project: project,
+                                ),
                               ),
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ),
-                          
-                          Padding(
-                            padding: const EdgeInsets.all(20),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Titre et menu
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        project['title'],
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
+                                Container(
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: project['topBorderColor'],
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(20),
+                                      topRight: Radius.circular(20),
                                     ),
-                                    // ✅ Icône more_vert séparée pour éviter le conflit de clic
-                                    GestureDetector(
-                                      onTap: () {
-                                        // Menu options du projet
-                                        _showProjectOptions(context, project);
-                                      },
-                                      child: Icon(
-                                        Icons.more_vert,
-                                        color: Colors.grey.shade400,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 8),
-                                
-                                // Description
-                                Text(
-                                  project['description'],
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade600,
-                                    height: 1.4,
                                   ),
                                 ),
                                 
-                                const SizedBox(height: 16),
-                                
-                                // Membres et date
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    SizedBox(
-                                      width: 32 + (members.length - 1) * 20.0,
-                                      height: 32,
-                                      child: Stack(
+                                Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          for (int i = 0; i < members.length; i++)
-                                            Positioned(
-                                              left: i * 20,
-                                              child: Container(
-                                                width: 32,
-                                                height: 32,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(color: Colors.white, width: 2),
-                                                  image: DecorationImage(
-                                                    image: NetworkImage(members[i]),
-                                                    fit: BoxFit.cover,
-                                                  ),
-                                                ),
+                                          Expanded(
+                                            child: Text(
+                                              project['title'],
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black87,
                                               ),
                                             ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () {
+                                              _showProjectOptions(context, index);
+                                            },
+                                            child: Icon(
+                                              Icons.more_vert,
+                                              color: Colors.grey.shade400,
+                                              size: 20,
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    ),
-                                    
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_today_outlined,
-                                          size: 14,
-                                          color: Colors.grey.shade500,
+                                      
+                                      const SizedBox(height: 8),
+                                      
+                                      Text(
+                                        project['description'],
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade600,
+                                          height: 1.4,
                                         ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          dateFormat.format(project['date']),
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade600,
+                                      ),
+                                      
+                                      const SizedBox(height: 16),
+                                      
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          members.isEmpty
+                                              ? Text(
+                                                  'Aucun membre',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.grey.shade500,
+                                                  ),
+                                                )
+                                              : SizedBox(
+                                                  width: 32 + (members.length - 1) * 20.0,
+                                                  height: 32,
+                                                  child: Stack(
+                                                    children: [
+                                                      for (int i = 0; i < members.length; i++)
+                                                        Positioned(
+                                                          left: i * 20,
+                                                          child: Container(
+                                                            width: 32,
+                                                            height: 32,
+                                                            decoration: BoxDecoration(
+                                                              shape: BoxShape.circle,
+                                                              border: Border.all(color: Colors.white, width: 2),
+                                                              image: DecorationImage(
+                                                                image: NetworkImage(members[i]),
+                                                                fit: BoxFit.cover,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                          
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.calendar_today_outlined,
+                                                size: 14,
+                                                color: Colors.grey.shade500,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                project['date'] != null
+                                                    ? dateFormat.format(project['date'])
+                                                    : 'Non définie',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      
+                                      const SizedBox(height: 16),
+                                      
+                                      Container(
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: FractionallySizedBox(
+                                          alignment: Alignment.centerLeft,
+                                          widthFactor: project['progress'] ?? 0.0,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: project['progressColor'],
+                                              borderRadius: BorderRadius.circular(3),
+                                            ),
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 16),
-                                
-                                // Barre de progression
-                                Container(
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
-                                    widthFactor: project['progress'],
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: project['progressColor'],
-                                        borderRadius: BorderRadius.circular(3),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                                
-                                const SizedBox(height: 10),
-                                
-                                // Pourcentage
-                                Text(
-                                  '${(project['progress'] * 100).toInt()}% complété',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
+                                      
+                                      const SizedBox(height: 10),
+                                      
+                                      Text(
+                                        '${((project['progress'] ?? 0.0) * 100).toInt()}% complété',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
             
             const SizedBox(height: 80),
@@ -344,11 +337,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ),
       
       floatingActionButton: GestureDetector(
-        onTap: () {
-          Navigator.push(
+        onTap: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CreateProjectPage()),
           );
+          
+          // Vérifier si le widget est toujours monté
+          if (mounted && result == true) {
+            setState(() {
+              // Rafraîchir la liste
+            });
+          }
         },
         child: Container(
           width: 56,
@@ -407,8 +407,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
-  // ✅ Menu options pour le projet
-  void _showProjectOptions(BuildContext context, Map<String, dynamic> project) {
+  void _showProjectOptions(BuildContext context, int index) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -445,7 +444,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 ListTile(
                   leading: const Icon(Icons.delete_outline, color: Colors.red),
                   title: const Text('Supprimer', style: TextStyle(color: Colors.red)),
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    setState(() {
+                      _projectService.deleteProject(index);
+                    });
+                    Navigator.pop(context);
+                  },
                 ),
               ],
             ),

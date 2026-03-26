@@ -124,7 +124,6 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
