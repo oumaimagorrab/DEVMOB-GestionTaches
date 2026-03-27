@@ -3,7 +3,7 @@ import 'package:gestiontaches/views/project/project_detail_page.dart';
 import 'package:intl/intl.dart';
 import 'create_project_page.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
-import 'package:gestiontaches/services/project_service.dart'; 
+import 'package:gestiontaches/services/project_service.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -343,11 +343,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
             MaterialPageRoute(builder: (context) => const CreateProjectPage()),
           );
           
-          // Vérifier si le widget est toujours monté
           if (mounted && result == true) {
-            setState(() {
-              // Rafraîchir la liste
-            });
+            setState(() {});
           }
         },
         child: Container(

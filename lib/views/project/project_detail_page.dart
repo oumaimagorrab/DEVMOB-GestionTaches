@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gestiontaches/views/task/add_task_page.dart';
-import 'package:gestiontaches/services/project_service.dart';
+import 'package:gestiontaches/services/task_service.dart';
+import 'package:gestiontaches/views/task/task_board_page.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final Map<String, dynamic> project;
@@ -17,7 +18,7 @@ class ProjectDetailPage extends StatefulWidget {
 class _ProjectDetailPageState extends State<ProjectDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final ProjectService _projectService = ProjectService();
+  final TaskService _taskService = TaskService();
 
   @override
   void initState() {
@@ -32,7 +33,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
   }
 
   List<Map<String, dynamic>> get tasks => 
-      _projectService.getTasks(widget.project['id'] ?? '');
+      _taskService.getTasks(widget.project['id'] ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +56,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Titre du projet
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
@@ -70,7 +70,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 12),
 
-          // Créé par
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -100,7 +99,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 20),
 
-          // Barre de progression dynamique
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: _buildProgressBar(),
@@ -108,7 +106,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 24),
 
-          // Onglets
           TabBar(
             controller: _tabController,
             labelColor: const Color(0xFF6B4EFF),
@@ -132,16 +129,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 16),
 
-          // Contenu des onglets
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Onglet Tâches
                 _buildTasksTab(),
-                // Onglet Membres
                 const Center(child: Text('Membres')),
-                // Onglet Infos
                 const Center(child: Text('Infos')),
               ],
             ),
@@ -200,7 +193,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          // Liste des tâches dynamique
           Expanded(
             child: tasks.isEmpty
                 ? Center(
@@ -234,7 +226,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 12),
 
-          // Bouton Ajouter une tâche
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -251,7 +242,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
                 
                 if (mounted && newTask != null) {
                   setState(() {
-                    _projectService.addTask(
+                    _taskService.addTask(
                       widget.project['id'] ?? '', 
                       newTask,
                     );
@@ -278,13 +269,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
           const SizedBox(height: 12),
 
-          // Bouton Voir le tableau des tâches
           GestureDetector(
             onTap: () {
-              Navigator.pushNamed(
-                context, 
-                '/kanban', 
-                arguments: widget.project,
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => KanbanBoardPage(project: widget.project),
+                ),
               );
             },
             child: Container(
@@ -360,7 +351,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
   Widget _buildTaskItem(Map<String, dynamic> task, int index) {
     return Dismissible(
-      key: Key('task_${task['title']}_$index'),
+      key: Key('task_${task['id']}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -373,7 +364,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
       ),
       onDismissed: (_) {
         setState(() {
-          tasks.removeAt(index);
+          _taskService.deleteTask(
+            widget.project['id'] ?? '',
+            task['id'],
+          );
         });
       },
       child: Container(
@@ -385,11 +379,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
         ),
         child: Row(
           children: [
-            // Checkbox interactive
             GestureDetector(
               onTap: () {
                 setState(() {
-                  task['isCompleted'] = !(task['isCompleted'] ?? false);
+                  _taskService.toggleTaskComplete(
+                    widget.project['id'] ?? '',
+                    task['id'],
+                  );
                 });
               },
               child: Container(
@@ -419,7 +415,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
 
             const SizedBox(width: 16),
 
-            // Contenu de la tâche
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,7 +468,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
               ),
             ),
 
-            // Avatar assigné
             Container(
               width: 36,
               height: 36,

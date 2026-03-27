@@ -1,10 +1,164 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-class TaskDetailPage extends StatelessWidget {
-  const TaskDetailPage({super.key});
+class TaskDetailPage extends StatefulWidget {
+  final Map<String, dynamic> task;
+  final String projectTitle;
+
+  const TaskDetailPage({
+    super.key,
+    required this.task,
+    required this.projectTitle,
+  });
+
+  @override
+  State<TaskDetailPage> createState() => _TaskDetailPageState();
+}
+
+class _TaskDetailPageState extends State<TaskDetailPage> {
+  late String _currentStatus;
+  late Map<String, dynamic> _task;
+
+  final List<Map<String, String>> statusOptions = [
+    {'value': 'todo', 'label': 'À faire', 'color': 'grey'},
+    {'value': 'inprogress', 'label': 'En cours', 'color': 'indigo'},
+    {'value': 'done', 'label': 'Terminé', 'color': 'green'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _task = Map.from(widget.task);
+    _currentStatus = _task['status'] ?? 'todo';
+    if (_task['isCompleted'] == true) {
+      _currentStatus = 'done';
+    }
+  }
+
+  String get _statusLabel {
+    switch (_currentStatus) {
+      case 'done':
+        return 'Terminé';
+      case 'inprogress':
+        return 'En cours';
+      case 'todo':
+      default:
+        return 'À faire';
+    }
+  }
+
+  Color get _statusColor {
+    switch (_currentStatus) {
+      case 'done':
+        return const Color(0xFF10B981);
+      case 'inprogress':
+        return const Color(0xFF6B4EFF);
+      case 'todo':
+      default:
+        return Colors.grey.shade600;
+    }
+  }
+
+  Color get _statusBgColor {
+    switch (_currentStatus) {
+      case 'done':
+        return const Color(0xFFD1FAE5);
+      case 'inprogress':
+        return const Color(0xFFE8E4FF);
+      case 'todo':
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  void _changeStatus() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Changer le statut',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...statusOptions.map((status) {
+                  final isSelected = _currentStatus == status['value'];
+                  final color = status['color'] == 'green' 
+                      ? const Color(0xFF10B981)
+                      : status['color'] == 'indigo'
+                          ? const Color(0xFF6B4EFF)
+                          : Colors.grey.shade600;
+                  
+                  return ListTile(
+                    leading: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    title: Text(
+                      status['label']!,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? color : Colors.black87,
+                      ),
+                    ),
+                    trailing: isSelected 
+                        ? Icon(Icons.check, color: color)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _currentStatus = status['value']!;
+                        _task['status'] = _currentStatus;
+                        _task['isCompleted'] = _currentStatus == 'done';
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final priorityColor = _task['priorityColor'] as Color? ?? Colors.orange;
+    final priorityLabel = _task['priority'] ?? 'Medium';
+    final assigneeName = _task['assigneeName'] ?? 'Non assigné';
+    final assigneeImage = _task['assignee'] ?? 'https://i.pravatar.cc/150?img=11';
+    final date = _task['date'] ?? 'Non définie';
+    final createdAt = _task['createdAt'] != null
+        ? DateFormat('d MMMM yyyy', 'fr_FR').format(DateTime.parse(_task['createdAt']))
+        : 'Date inconnue';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
@@ -12,16 +166,40 @@ class TaskDetailPage extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black54),
-          onPressed: () {},
+          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.black54),
-            onPressed: () {},
+            onPressed: () {
+              // TODO: Modifier la tâche
+            },
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.black54),
-            onPressed: () {},
+            onPressed: () {
+              // TODO: Supprimer la tâche
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Supprimer la tâche'),
+                  content: const Text('Voulez-vous vraiment supprimer cette tâche ?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Annuler'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.pop(context, {'deleted': true});
+                      },
+                      child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -31,28 +209,29 @@ class TaskDetailPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Status Chip
+              // Projet parent
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8E4FF),
+                  color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(
+                      Icons.folder_outlined,
+                      size: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 6),
                     Text(
-                      'En cours',
+                      widget.projectTitle,
                       style: TextStyle(
-                        color: Colors.indigo[400],
-                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 16,
-                      color: Colors.indigo[400],
                     ),
                   ],
                 ),
@@ -60,10 +239,51 @@ class TaskDetailPage extends StatelessWidget {
               
               const SizedBox(height: 16),
               
-              // Title
-              const Text(
-                'Développer l\'API REST',
-                style: TextStyle(
+              // Status Chip (cliquable)
+              GestureDetector(
+                onTap: _changeStatus,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _statusBgColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _statusLabel,
+                        style: TextStyle(
+                          color: _statusColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 16,
+                        color: _statusColor,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Title dynamique
+              Text(
+                _task['title'] ?? 'Sans titre',
+                style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -72,9 +292,11 @@ class TaskDetailPage extends StatelessWidget {
               
               const SizedBox(height: 12),
               
-              // Description
+              // Description dynamique
               Text(
-                'Créer les endpoints pour la gestion des utilisateurs, projets et tâches.\nImplémenter l\'authentification JWT et les permissions.',
+                _task['description']?.isNotEmpty == true
+                    ? _task['description']
+                    : 'Aucune description',
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.grey[600],
@@ -108,14 +330,12 @@ class TaskDetailPage extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             radius: 14,
-                            backgroundImage: NetworkImage(
-                              'https://i.pravatar.cc/150?img=11',
-                            ),
+                            backgroundImage: NetworkImage(assigneeImage),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Bob Durand',
-                            style: TextStyle(
+                          Text(
+                            assigneeName,
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -141,39 +361,40 @@ class TaskDetailPage extends StatelessWidget {
                       label: 'Échéance',
                       child: Row(
                         children: [
-                          const Text(
-                            '15 Mars 2024',
-                            style: TextStyle(
+                          Text(
+                            date,
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red[50],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'En retard',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.red[400],
-                                fontWeight: FontWeight.w600,
+                          if (_currentStatus != 'done')
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'En retard',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.red[400],
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
                     
                     const Divider(height: 24),
                     
-                    // Priority
+                    // Priority dynamique
                     _buildInfoRow(
                       icon: Icons.flag_outlined,
                       label: 'Priorité',
@@ -183,14 +404,14 @@ class TaskDetailPage extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.red[50],
+                          color: priorityColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          'High',
+                          priorityLabel,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.red[400],
+                            color: priorityColor,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -203,7 +424,7 @@ class TaskDetailPage extends StatelessWidget {
                     _buildInfoRow(
                       icon: Icons.access_time,
                       label: 'Créée le',
-                      value: '8 Mars 2024',
+                      value: createdAt,
                     ),
                   ],
                 ),
