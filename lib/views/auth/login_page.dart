@@ -1,8 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'register_page.dart';
 import 'package:gestiontaches/views/project/dashboard_page.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -10,6 +10,8 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const LoginScreen();
+    
+
   }
 }
 
@@ -23,14 +25,12 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   bool _obscurePassword = true;
-  bool _isLoading = false;
+  
   
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+
   
   late AnimationController _logoController;
   late Animation<double> _pulseAnimation;
@@ -56,85 +56,36 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  // Connexion avec Email/Mot de passe
   Future<void> _loginWithEmail() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
 
-    try {
-      await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
+    final success = await authProvider.signInWithEmail(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (success && mounted) {
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const DashboardPage()),
-        (route) => false, // Supprime toutes les routes précédentes
-        );
-      }
-      
-      // Navigation automatique grâce au StreamBuilder dans main.dart
-    } on FirebaseAuthException catch (e) {
-      String message = 'Erreur de connexion';
-      if (e.code == 'user-not-found') {
-        message = 'Aucun utilisateur trouvé avec cet email';
-      } else if (e.code == 'wrong-password') {
-        message = 'Mot de passe incorrect';
-      } else if (e.code == 'invalid-email') {
-        message = 'Email invalide';
-      } else if (e.code == 'user-disabled') {
-        message = 'Ce compte a été désactivé';
-      }
-      
-      _showError(message);
-    } catch (e) {
-      _showError('Erreur: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+        (route) => false,
+      );
+    } else {
+      _showError(authProvider.error ?? 'Erreur de connexion');
     }
   }
 
-  // Connexion avec Google
   Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
 
-    try {
-      // Déclencher le flux de connexion Google
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
-      if (googleUser == null) {
-        // L'utilisateur a annulé la connexion
-        setState(() => _isLoading = false);
-        return;
-      }
+    final success = await authProvider.signInWithGoogle();
 
-      // Obtenir les détails d'authentification
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      // Créer les credentials Firebase
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Connexion à Firebase
-      UserCredential userCredential =
-      await _auth.signInWithCredential(credential);
-
-      // ✅ Navigation vers Dashboard
-    if (userCredential.user != null && mounted) {
+    if (success && mounted) {
       Navigator.pushReplacementNamed(context, '/dashboard');
-    }
-      
-      // Navigation automatique
-    } on FirebaseAuthException catch (e) {
-      _showError('Erreur Firebase: ${e.message}');
-    } catch (e) {
-      _showError('Erreur Google Sign-In: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    } else {
+      _showError(authProvider.error ?? 'Erreur Google');
     }
   }
 
@@ -162,6 +113,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<AppAuthProvider>().isLoading;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -392,7 +344,7 @@ class _LoginScreenState extends State<LoginScreen>
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _isLoading ? null : _loginWithEmail,
+                      onPressed: isLoading ? null : _loginWithEmail,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF5B5BD6),
                         foregroundColor: Colors.white,
@@ -402,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen>
                         elevation: 0,
                         disabledBackgroundColor: Colors.grey.shade400,
                       ),
-                      child: _isLoading
+                      child: isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
@@ -459,7 +411,7 @@ class _LoginScreenState extends State<LoginScreen>
                     width: double.infinity,
                     height: 50,
                     child: OutlinedButton(
-                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      onPressed: isLoading ? null : _signInWithGoogle,
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.white,
                         side: BorderSide(color: Colors.grey.shade300),
@@ -553,11 +505,16 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    try {
-      await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
+    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+
+    final success = await authProvider.resetPassword(
+      _emailController.text.trim(),
+    );
+
+    if (success) {
       _showSuccess('Email de réinitialisation envoyé !');
-    } catch (e) {
-      _showError('Erreur: ${e.toString()}');
+    } else {
+      _showError(authProvider.error ?? 'Erreur');
     }
   }
 }

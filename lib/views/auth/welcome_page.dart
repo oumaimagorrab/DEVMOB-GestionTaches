@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';  // ← AJOUTÉ
+import 'package:gestiontaches/providers/auth_provider.dart';
+import 'login_page.dart';  // ← AJOUTÉ
+import 'register_page.dart';  // ← AJOUTÉ
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -97,7 +101,7 @@ class _WelcomePageState extends State<WelcomePage>
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // 🔵 Logo animé avec effet de pulsation
+                        // Logo animé avec effet de pulsation
                         ScaleTransition(
                           scale: _scaleAnimation,
                           child: _AnimatedLogo(),
@@ -105,7 +109,7 @@ class _WelcomePageState extends State<WelcomePage>
 
                         const SizedBox(height: 32),
 
-                        // 📝 Titre avec dégradé
+                        // Titre avec dégradé
                         ShaderMask(
                           shaderCallback: (bounds) => const LinearGradient(
                             colors: [Color(0xFF5B5BD6), Color(0xFF8B5CF6)],
@@ -125,7 +129,7 @@ class _WelcomePageState extends State<WelcomePage>
 
                         const SizedBox(height: 12),
 
-                        // 📄 Description améliorée
+                        // Description améliorée
                         Text(
                           "Gérez vos projets et collaborez efficacement avec votre équipe en temps réel.",
                           textAlign: TextAlign.center,
@@ -139,7 +143,7 @@ class _WelcomePageState extends State<WelcomePage>
 
                         const SizedBox(height: 40),
 
-                        // ✨ Points forts (valeurs ajoutées)
+                        // Points forts (valeurs ajoutées)
                         _FeatureRow(
                           icon: Icons.people_outline,
                           text: "Collaboration en équipe",
@@ -160,31 +164,45 @@ class _WelcomePageState extends State<WelcomePage>
 
                         const SizedBox(height: 40),
 
-                        // 🔘 Bouton Se connecter avec effet de vague
+                        // 🔘 Bouton Se connecter - NAVIGATION CORRIGÉE
                         _AnimatedButton(
                           text: "Se connecter",
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            Navigator.pushNamed(context, '/login');
-                          },
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChangeNotifierProvider.value(
+                                value: Provider.of<AppAuthProvider>(context, listen: false),
+                                child: const LoginPage(),
+                              ),
+                            ),
+                          );
+                        },
                           isPrimary: true,
                         ),
 
                         const SizedBox(height: 16),
 
-                        // 🔘 Bouton S'inscrire
+                        // 🔘 Bouton S'inscrire - NAVIGATION CORRIGÉE
                         _AnimatedButton(
                           text: "S'inscrire",
                           onPressed: () {
                             HapticFeedback.lightImpact();
-                            Navigator.pushNamed(context, '/register');
+                            // ✅ SOLUTION 1 : Navigation simple qui préserve le Provider
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RegisterPage(),
+                              ),
+                            );
                           },
                           isPrimary: false,
                         ),
 
                         const SizedBox(height: 24),
 
-                        // 🔗 Lien "Continuer en tant qu'invité"
+                        // Lien "Continuer en tant qu'invité"
                         TextButton(
                           onPressed: () {
                             // Navigation invité
@@ -265,7 +283,6 @@ class _AnimatedLogoState extends State<_AnimatedLogo>
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Cercle de fond avec dégradé
               Container(
                 width: 90,
                 height: 90,
@@ -290,7 +307,6 @@ class _AnimatedLogoState extends State<_AnimatedLogo>
                   size: 44,
                 ),
               ),
-              // Badge éclair positionné
               Positioned(
                 bottom: 0,
                 right: 0,

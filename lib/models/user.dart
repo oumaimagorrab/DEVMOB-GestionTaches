@@ -1,31 +1,57 @@
-class Member {
+class UserModel {
+  final String id;
   final String name;
   final String email;
-  final String image;
-  final bool isRegistered;
+  final String? photoURL;
+  final DateTime createdAt;
+  final bool isActive;
 
-  Member({
+  UserModel({
+    required this.id,
     required this.name,
     required this.email,
-    required this.image,
-    this.isRegistered = false,
+    this.photoURL,
+    required this.createdAt,
+    this.isActive = true,
   });
 
-  Map<String, dynamic> toMap() {
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] ?? json['uid'] ?? '',
+      name: json['name'] ?? json['nomComplet'] ?? '',
+      email: json['email'] ?? '',
+      photoURL: json['photoURL'] ?? json['avatar'],
+      createdAt: json['createdAt']?.toDate() ?? DateTime.now(),
+      isActive: json['isActive'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'name': name,
       'email': email,
-      'image': image,
-      'isRegistered': isRegistered,
+      'photoURL': photoURL,
+      'createdAt': createdAt.toIso8601String(),
+      'isActive': isActive,
     };
   }
 
-  factory Member.fromMap(Map<String, dynamic> map) {
-    return Member(
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      image: map['image'] ?? '',
-      isRegistered: map['isRegistered'] ?? false,
+  UserModel copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? photoURL,
+    DateTime? createdAt,
+    bool? isActive,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      photoURL: photoURL ?? this.photoURL,
+      createdAt: createdAt ?? this.createdAt,
+      isActive: isActive ?? this.isActive,
     );
   }
 }

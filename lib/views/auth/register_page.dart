@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:gestiontaches/providers/auth_provider.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -17,19 +15,14 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptConditions = false;
-  bool _isLoading = false;
   
-  // Contrôleurs pour récupérer les valeurs des champs
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
-  // Pour la gestion de l'image
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
-  
-  // Clé pour le formulaire
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -41,7 +34,6 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-    // Fonction pour choisir la source de l'image
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
@@ -58,13 +50,10 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       debugPrint('Erreur: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de la sélection de l\'image')),
-      );
+      _showError('Erreur lors de la sélection de l\'image');
     }
   }
 
-  // Afficher le bottom sheet pour choisir caméra ou galerie
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
@@ -183,124 +172,66 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // Fonction d'inscription Firebase
+  // Inscription via Provider
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Les mots de passe ne correspondent pas'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('Les mots de passe ne correspondent pas');
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      print('🔥 Début inscription...');
-      print('📧 Email: ${_emailController.text.trim()}');
-      print('👤 Nom: ${_nameController.text.trim()}');
-
-      // Vérifier si Firebase est initialisé
-      if (Firebase.apps.isEmpty) {
-        print('❌ Firebase non initialisé !');
-        throw Exception('Firebase non initialisé');
-      }
-
-      // 1. Créer l'utilisateur
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      
-      print('✅ Utilisateur créé: ${userCredential.user?.uid}');
-
-      // 2. Sauvegarder dans Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-        'nomComplet': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'uid': userCredential.user!.uid,
-      });
-      
-      print('✅ Données sauvegardées dans Firestore');
-
-      // 3. Mettre à jour le profil
-      await userCredential.user!.updateDisplayName(_nameController.text.trim());
-      print('✅ Profil mis à jour');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Compte créé avec succès !'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Optionnel : naviguer vers la page login ou home
-        // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePage()));
-      }
-
-    } on FirebaseAuthException catch (e) {
-      print('❌ FirebaseAuthException: ${e.code} - ${e.message}');
-      String message;
-      switch (e.code) {
-        case 'weak-password':
-          message = 'Le mot de passe est trop faible (min 6 caractères)';
-          break;
-        case 'email-already-in-use':
-          message = 'Un compte existe déjà avec cet email';
-          break;
-        case 'invalid-email':
-          message = 'Format d\'email invalide';
-          break;
-        case 'operation-not-allowed':
-          message = 'Inscription par email désactivée dans Firebase Console';
-          break;
-        case 'network-request-failed':
-          message = 'Problème de connexion internet';
-          break;
-        default:
-          message = 'Erreur Firebase: ${e.message}';
-      }
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e, stackTrace) {
-      print('❌ Erreur inattendue: $e');
-      print('📍 Stack trace: $stackTrace');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    if (!_acceptConditions) {
+      _showError('Veuillez accepter les conditions');
+      return;
     }
+
+    final authProvider = context.read<AppAuthProvider>();
+    
+    final imageUrl = _profileImage?.path ?? '';
+
+    final success = await authProvider.signUp(
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+      imageUrl: imageUrl,
+    );
+
+    if (success && mounted) {
+      _showSuccess('Compte créé avec succès !');
+      // Optionnel: naviguer vers login ou dashboard
+      Navigator.pop(context); // Retour à la page login
+    } else if (mounted && authProvider.error != null) {
+      _showError(authProvider.error!);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<AppAuthProvider>().isLoading;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -308,7 +239,7 @@ class _RegisterPageState extends State<RegisterPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: isLoading ? null : () => Navigator.pop(context),
         ),
         title: const Text(
           'Créer un compte',
@@ -330,14 +261,13 @@ class _RegisterPageState extends State<RegisterPage> {
                 children: [
                   const SizedBox(height: 20),
                   
-                  // 🔵 PHOTO DE PROFIL AVEC CAMÉRA FONCTIONNELLE
+                  // Photo de profil
                   Center(
                     child: GestureDetector(
                       onTap: _showImageSourceDialog,
                       child: Stack(
                         alignment: Alignment.bottomRight,
                         children: [
-                          // Container de la photo
                           Container(
                             width: 120,
                             height: 120,
@@ -352,7 +282,6 @@ class _RegisterPageState extends State<RegisterPage> {
                                   offset: const Offset(0, 4),
                                 ),
                               ],
-                              // Affiche l'image si sélectionnée, sinon fond gris
                               image: _profileImage != null
                                   ? DecorationImage(
                                       image: FileImage(_profileImage!),
@@ -368,8 +297,6 @@ class _RegisterPageState extends State<RegisterPage> {
                                   )
                                 : null,
                           ),
-                          
-                          // Bouton caméra cliquable
                           Container(
                             width: 40,
                             height: 40,
@@ -401,7 +328,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   const SizedBox(height: 32),
                   
-                  // Champ Nom complet
+                  // Champs du formulaire
                   _buildTextField(
                     controller: _nameController,
                     hintText: 'Nom complet',
@@ -416,7 +343,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   
                   const SizedBox(height: 16),
                   
-                  // Champ Email
                   _buildTextField(
                     controller: _emailController,
                     hintText: 'Email',
@@ -435,7 +361,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   
                   const SizedBox(height: 16),
                   
-                  // Champ Mot de passe
                   _buildPasswordField(
                     controller: _passwordController,
                     hintText: 'Mot de passe',
@@ -458,7 +383,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   
                   const SizedBox(height: 16),
                   
-                  // Champ Confirmer mot de passe
                   _buildPasswordField(
                     controller: _confirmPasswordController,
                     hintText: 'Confirmer le mot de passe',
@@ -483,11 +407,13 @@ class _RegisterPageState extends State<RegisterPage> {
                     children: [
                       Checkbox(
                         value: _acceptConditions,
-                        onChanged: (value) {
-                          setState(() {
-                            _acceptConditions = value ?? false;
-                          });
-                        },
+                        onChanged: isLoading
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _acceptConditions = value ?? false;
+                                });
+                              },
                         activeColor: const Color(0xFF5B5BD6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
@@ -495,11 +421,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _acceptConditions = !_acceptConditions;
-                            });
-                          },
+                          onTap: isLoading
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _acceptConditions = !_acceptConditions;
+                                  });
+                                },
                           child: const Text(
                             "J'accepte les conditions",
                             style: TextStyle(
@@ -519,7 +447,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: (_acceptConditions && !_isLoading) ? _register : null,
+                      onPressed: (_acceptConditions && !isLoading) ? _register : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF5B5BD6),
                         foregroundColor: Colors.white,
@@ -529,7 +457,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         elevation: 0,
                       ),
-                      child: _isLoading
+                      child: isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
@@ -562,9 +490,11 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                              },
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.only(left: 4),
                           minimumSize: const Size(0, 0),

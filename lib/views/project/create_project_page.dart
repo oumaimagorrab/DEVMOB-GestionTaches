@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:gestiontaches/services/project_service.dart';
-import 'package:gestiontaches/models/user.dart';
+import 'package:gestiontaches/models/user.dart'; // Utilisation de UserModel
 
 class CreateProjectPage extends StatefulWidget {
   const CreateProjectPage({super.key});
@@ -29,39 +29,47 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     const Color(0xFF3B82F6),
   ];
 
-  // Base de données simulée des utilisateurs enregistrés
-  final Map<String, Member> registeredUsers = {
-    'alice@example.com': Member(
+  // Base de données simulée des utilisateurs enregistrés (utilise UserModel)
+  final Map<String, UserModel> registeredUsers = {
+    'alice@example.com': UserModel(
+      id: '1',
       name: 'Alice Martin',
       email: 'alice@example.com',
-      image: 'https://i.pravatar.cc/150?img=1',
-      isRegistered: true,
+      photoURL: 'https://i.pravatar.cc/150?img=1',
+      createdAt: DateTime.now(),
+      isActive: true,
     ),
-    'bob@example.com': Member(
+    'bob@example.com': UserModel(
+      id: '2',
       name: 'Bob Durand',
       email: 'bob@example.com',
-      image: 'https://i.pravatar.cc/150?img=2',
-      isRegistered: true,
+      photoURL: 'https://i.pravatar.cc/150?img=2',
+      createdAt: DateTime.now(),
+      isActive: true,
     ),
-    'claire@example.com': Member(
+    'claire@example.com': UserModel(
+      id: '3',
       name: 'Claire Petit',
       email: 'claire@example.com',
-      image: 'https://i.pravatar.cc/150?img=3',
-      isRegistered: true,
+      photoURL: 'https://i.pravatar.cc/150?img=3',
+      createdAt: DateTime.now(),
+      isActive: true,
     ),
-    'david@example.com': Member(
+    'david@example.com': UserModel(
+      id: '4',
       name: 'David Bernard',
       email: 'david@example.com',
-      image: 'https://i.pravatar.cc/150?img=4',
-      isRegistered: true,
+      photoURL: 'https://i.pravatar.cc/150?img=4',
+      createdAt: DateTime.now(),
+      isActive: true,
     ),
   };
 
   // Membres récents pour l'affichage rapide
-  final List<Member> recentMembers = [];
+  final List<UserModel> recentMembers = [];
 
   // Membres invités au projet
-  List<Member> invitedMembers = [];
+  List<UserModel> invitedMembers = [];
 
   @override
   void initState() {
@@ -140,25 +148,27 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     // Simuler un appel API
     await Future.delayed(const Duration(seconds: 1));
 
-    Member? member;
+    UserModel? user;
     bool isNewUser = false;
 
     // Vérifier si l'utilisateur existe dans la base
     if (registeredUsers.containsKey(email)) {
-      member = registeredUsers[email]!;
+      user = registeredUsers[email]!;
     } else {
       // Créer un nouvel utilisateur non enregistré
       isNewUser = true;
-      member = Member(
+      user = UserModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(), // Générer un ID unique
         name: email.split('@')[0], // Utiliser la partie avant @ comme nom temporaire
         email: email,
-        image: 'https://i.pravatar.cc/150?img=${email.hashCode % 70}',
-        isRegistered: false,
+        photoURL: 'https://i.pravatar.cc/150?img=${email.hashCode % 70}',
+        createdAt: DateTime.now(),
+        isActive: false, // Non actif car non enregistré
       );
     }
 
     setState(() {
-      invitedMembers.add(member!);
+      invitedMembers.add(user!);
       _emailController.clear();
       _isInviting = false;
     });
@@ -169,7 +179,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       // Ici vous pouvez intégrer un vrai service d'email
       _sendEmailInvitation(email);
     } else {
-      _showSnackBar('${member.name} a été ajouté au projet', isSuccess: true);
+      _showSnackBar('${user.name} a été ajouté au projet', isSuccess: true);
     }
   }
 
@@ -210,8 +220,8 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       'date': _selectedDate,
       'members': invitedMembers.isEmpty 
           ? ['https://i.pravatar.cc/150?img=11']
-          : invitedMembers.map((m) => m.image).toList(),
-      'memberDetails': invitedMembers.map((m) => m.toMap()).toList(),
+          : invitedMembers.map((m) => m.photoURL).toList(),
+      'memberDetails': invitedMembers.map((m) => m.toJson()).toList(),
       'topBorderColor': projectColors[_selectedColorIndex],
     };
     
@@ -458,7 +468,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                   scrollDirection: Axis.horizontal,
                   itemCount: invitedMembers.length,
                   itemBuilder: (context, index) {
-                    final member = invitedMembers[index];
+                    final user = invitedMembers[index];
                     return Padding(
                       padding: const EdgeInsets.only(right: 12),
                       child: Column(
@@ -475,12 +485,13 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                                     width: 2,
                                   ),
                                   image: DecorationImage(
-                                    image: NetworkImage(member.image),
+                                    image: NetworkImage(user.photoURL ?? 'https://i.pravatar.cc/150?img=0'),
                                     fit: BoxFit.cover,
                                   ),
                                 ),
                               ),
-                              if (!member.isRegistered)
+                              // Indicateur pour utilisateur non actif (non enregistré)
+                              if (!user.isActive)
                                 Positioned(
                                   right: 0,
                                   bottom: 0,
@@ -524,13 +535,13 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            member.name.split(' ')[0],
+                            user.name.split(' ')[0],
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          if (!member.isRegistered)
+                          if (!user.isActive)
                             Text(
                               'En attente',
                               style: TextStyle(
@@ -633,26 +644,26 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                 runSpacing: 12,
                 children: recentMembers.where((m) => 
                   !invitedMembers.any((invited) => invited.email == m.email)
-                ).map((member) {
+                ).map((user) {
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        invitedMembers.add(member);
+                        invitedMembers.add(user);
                       });
-                      _showSnackBar('${member.name} ajouté', isSuccess: true);
+                      _showSnackBar('${user.name} ajouté', isSuccess: true);
                     },
                     child: Chip(
                       avatar: CircleAvatar(
-                        backgroundImage: NetworkImage(member.image),
+                        backgroundImage: NetworkImage(user.photoURL ?? 'https://i.pravatar.cc/150?img=0'),
                       ),
-                      label: Text(member.name),
+                      label: Text(user.name),
                       backgroundColor: Colors.grey.shade100,
                       deleteIcon: const Icon(Icons.add, size: 18),
                       onDeleted: () {
                         setState(() {
-                          invitedMembers.add(member);
+                          invitedMembers.add(user);
                         });
-                        _showSnackBar('${member.name} ajouté', isSuccess: true);
+                        _showSnackBar('${user.name} ajouté', isSuccess: true);
                       },
                     ),
                   );
