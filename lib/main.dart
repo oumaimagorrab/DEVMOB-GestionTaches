@@ -12,7 +12,9 @@ import 'views/task/task_board_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart'; 
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'providers/auth_provider.dart'; // Ton AuthProvider
+import 'providers/auth_provider.dart';
+import 'providers/project_provider.dart'; // <- ajouté
+import 'providers/task_provider.dart'; // <- ajouté
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +32,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppAuthProvider()),
-        // tu peux ajouter d'autres providers ici si besoin
+        ChangeNotifierProvider(create: (_) => ProjectProvider()),
+        ChangeNotifierProvider(create: (_) => TaskProvider()), // <- ajouté
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -58,7 +61,7 @@ class MyApp extends StatelessWidget {
           '/createprojects': (context) => const CreateProjectPage(),
           '/team': (context) => const TeamMembersPage(),
           '/userprofile': (context) => const ProfilePage(),
-          '/kanban' : (context) => const KanbanBoardPage(),
+          //'/kanban' : (context) => const KanbanBoardPage(),
         },
       ),
     );

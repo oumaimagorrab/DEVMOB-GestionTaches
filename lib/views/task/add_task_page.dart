@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:gestiontaches/models/task.dart';
+import 'package:provider/provider.dart';
+import 'package:gestiontaches/providers/task_provider.dart';
 
 class CreateTaskPage extends StatefulWidget {
   final String projectId;
@@ -21,6 +24,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
   String _selectedPriority = 'Medium';
   String _selectedAssignee = '';
   bool _notifyOnComplete = false;
+  bool _isSaving = false;
 
   final List<Map<String, dynamic>> assignees = [
     {'name': 'Bob Durand', 'image': 'https://i.pravatar.cc/150?img=2'},
@@ -68,7 +72,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
     }
   }
 
-  void _saveTask() {
+  Future<void> _saveTask() async {
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez entrer un nom de tâche')),
@@ -76,39 +80,50 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
       return;
     }
 
+    setState(() => _isSaving = true);
+
     final assigneeData = assignees.firstWhere(
       (a) => a['name'] == _selectedAssignee,
       orElse: () => assignees.first,
     );
 
-    final newTask = {
-      'title': _titleController.text,
-      'description': _descriptionController.text,
-      'priority': _selectedPriority,
-      'priorityColor': _getPriorityColor(_selectedPriority),
-      'date': _selectedDate != null 
-          ? DateFormat('d MMM').format(_selectedDate!)
-          : DateFormat('d MMM').format(DateTime.now()),
-      'comments': 0,
-      'assignee': assigneeData['image'],
-      'assigneeName': assigneeData['name'],
-      'status': 'todo',
-      'isCompleted': false,
-      'createdAt': DateTime.now().toIso8601String(),
-      'notifyOnComplete': _notifyOnComplete, // ✅ UTILISÉ ICI
-    };
+    final taskProvider = context.read<TaskProvider>();
 
-    // Afficher confirmation si notification activée
-    if (_notifyOnComplete) {
+    // CRÉATION VIA TASK PROVIDER → FIRESTORE
+    final task = await taskProvider.createTask(
+      projectId: widget.projectId,
+      title: _titleController.text,
+      description: _descriptionController.text,
+      priority: _selectedPriority.toLowerCase(),
+      createdBy: 'currentUserId', // TODO: Remplacer par l'ID réel de l'utilisateur
+      assigneeId: assigneeData['image'],
+      dueDate: _selectedDate,
+    );
+
+    setState(() => _isSaving = false);
+
+    if (task != null) {
+      // Notification si activée
+      if (_notifyOnComplete) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vous serez notifié lorsque la tâche sera terminée'),
+            backgroundColor: Color(0xFF6B4EFF),
+          ),
+        );
+      }
+      
+      // Succès
+      Navigator.pop(context, true);
+    } else {
+      // Erreur
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vous serez notifié lorsque la tâche sera terminée'),
-          backgroundColor: Color(0xFF6B4EFF),
+        SnackBar(
+          content: Text(taskProvider.error ?? 'Erreur lors de la création'),
+          backgroundColor: Colors.red,
         ),
       );
     }
-
-    Navigator.pop(context, newTask);
   }
 
   Color _getPriorityColor(String priority) {
@@ -147,7 +162,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: ElevatedButton(
-              onPressed: _saveTask,
+              onPressed: _isSaving ? null : _saveTask,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6B4EFF),
                 foregroundColor: Colors.white,
@@ -156,14 +171,23 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 elevation: 0,
-              ),
-              child: const Text(
-                'Enregistrer',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              ),  
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Enregistrer',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],

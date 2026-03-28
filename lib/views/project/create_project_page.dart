@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:gestiontaches/services/project_service.dart';
-import 'package:gestiontaches/models/user.dart'; // Utilisation de UserModel
+import 'package:gestiontaches/models/user.dart'; 
+import 'package:gestiontaches/providers/project_provider.dart';
+import 'package:provider/provider.dart';
 
 class CreateProjectPage extends StatefulWidget {
   const CreateProjectPage({super.key});
@@ -204,29 +205,35 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     );
   }
 
-  void _createProject() {
-    if (_nameController.text.isEmpty) {
+
+  Future<void> _createProject() async {
+    if (_nameController.text.trim().isEmpty) {
       _showSnackBar('Veuillez entrer un nom de projet');
       return;
     }
-    
-    final newProject = {
-      'title': _nameController.text,
-      'description': _descriptionController.text.isEmpty 
-          ? 'Aucune description' 
-          : _descriptionController.text,
-      'progress': 0.0,
-      'progressColor': projectColors[_selectedColorIndex],
-      'date': _selectedDate,
-      'members': invitedMembers.isEmpty 
-          ? ['https://i.pravatar.cc/150?img=11']
-          : invitedMembers.map((m) => m.photoURL).toList(),
-      'memberDetails': invitedMembers.map((m) => m.toJson()).toList(),
-      'topBorderColor': projectColors[_selectedColorIndex],
-    };
-    
-    ProjectService().addProject(newProject);
-    Navigator.pop(context, true);
+
+    final provider = Provider.of<ProjectProvider>(context, listen: false);
+    final members = invitedMembers.map((m) => m.id).toList();
+
+    final project = await provider.createProject(
+      title: _nameController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      createdBy: 'user_id_courant',
+      members: members,
+      color: projectColors[_selectedColorIndex].value.toRadixString(16),
+    );
+
+    if (project != null) {
+      // Ajouter le projet via la méthode publique
+      provider.addProjectLocally(project);
+
+      _showSnackBar('Projet créé avec succès', isSuccess: true);
+      Navigator.pop(context, true);
+    } else {
+      _showSnackBar('Erreur lors de la création du projet');
+    }
   }
 
   @override
@@ -254,7 +261,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: TextButton(
-              onPressed: _nameController.text.isNotEmpty ? _createProject : null,
+              onPressed: _nameController.text.trim().isEmpty ? null : () => _createProject(),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF5B5BD6),
                 disabledForegroundColor: Colors.grey.shade400,
@@ -266,7 +273,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+            )
           ),
         ],
       ),

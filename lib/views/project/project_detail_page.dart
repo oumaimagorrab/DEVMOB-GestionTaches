@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:gestiontaches/views/task/add_task_page.dart';
-import 'package:gestiontaches/services/task_service.dart';
 import 'package:gestiontaches/views/task/task_board_page.dart';
+import 'package:gestiontaches/models/project.dart';
+import 'package:provider/provider.dart';
+import 'package:gestiontaches/providers/task_provider.dart';
+import 'package:gestiontaches/models/task.dart';
 
 class ProjectDetailPage extends StatefulWidget {
-  final Map<String, dynamic> project;
+  final ProjectModel project;
 
   const ProjectDetailPage({
     super.key,
@@ -18,11 +21,16 @@ class ProjectDetailPage extends StatefulWidget {
 class _ProjectDetailPageState extends State<ProjectDetailPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final TaskService _taskService = TaskService();
 
   @override
   void initState() {
     super.initState();
+
+    final taskProvider = context.read<TaskProvider>();
+    taskProvider.initProjectTasksStream(widget.project.id);
+
+    taskProvider.loadStats(widget.project.id);
+
     _tabController = TabController(length: 3, vsync: this);
   }
 
@@ -32,11 +40,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
     super.dispose();
   }
 
-  List<Map<String, dynamic>> get tasks => 
-      _taskService.getTasks(widget.project['id'] ?? '');
 
   @override
   Widget build(BuildContext context) {
+    final taskProvider = context.watch<TaskProvider>();
+
+
+// Stats si tu veux les afficher
+final stats = taskProvider.stats;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -59,7 +70,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              widget.project['title'] ?? 'Projet sans titre',
+              widget.project.title,
               style: const TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
@@ -121,7 +132,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
               fontWeight: FontWeight.w500,
             ),
             tabs: [
-              Tab(text: 'Tâches (${tasks.length})'),
+              Tab(text: 'Tâches (${taskProvider.tasks.length})'),
               const Tab(text: 'Membres'),
               const Tab(text: 'Infos'),
             ],
@@ -145,8 +156,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
   }
 
   Widget _buildProgressBar() {
-    final total = tasks.length;
-    final completed = tasks.where((t) => t['isCompleted'] == true).length;
+    final allTasks = context.watch<TaskProvider>().tasks;
+    final total = allTasks.length;
+    final completed = allTasks.where((t) => t.isCompleted).length;
     final progress = total > 0 ? completed / total : 0.0;
 
     return Column(
@@ -189,12 +201,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
   }
 
   Widget _buildTasksTab() {
+    final taskProvider = context.watch<TaskProvider>();
+    final allTasks = taskProvider.tasks;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           Expanded(
-            child: tasks.isEmpty
+            child: allTasks.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -216,10 +230,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
                     ),
                   )
                 : ListView.builder(
-                    itemCount: tasks.length,
+                    itemCount: allTasks.length,
                     itemBuilder: (context, index) {
-                      final task = tasks[index];
-                      return _buildTaskItem(task, index);
+                      final task = allTasks[index];
+                      return _buildTaskItem(task);
                     },
                   ),
           ),
@@ -231,22 +245,20 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
             height: 50,
             child: OutlinedButton.icon(
               onPressed: () async {
-                final newTask = await Navigator.push(
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CreateTaskPage(
-                      projectId: widget.project['id'] ?? '',
-                    ),
+                    builder: (context) => CreateTaskPage(projectId: widget.project.id),
                   ),
                 );
-                
-                if (mounted && newTask != null) {
-                  setState(() {
-                    _taskService.addTask(
-                      widget.project['id'] ?? '', 
-                      newTask,
-                    );
-                  });
+
+                  if (result == true && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Tâche créée avec succès'),
+                      backgroundColor: Color(0xFF10B981),
+                    ),
+                  );
                 }
               },
               icon: const Icon(Icons.add, size: 20),
@@ -349,9 +361,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
     );
   }
 
-  Widget _buildTaskItem(Map<String, dynamic> task, int index) {
+  Widget _buildTaskItem(TaskModel task) {
     return Dismissible(
-      key: Key('task_${task['id']}'),
+      key: Key('task_${task.id}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -362,13 +374,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
         ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      onDismissed: (_) {
-        setState(() {
-          _taskService.deleteTask(
-            widget.project['id'] ?? '',
-            task['id'],
-          );
-        });
+      onDismissed: (_) async{
+          final taskProvider = context.read<TaskProvider>();
+          await taskProvider.deleteTask(task.id);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -380,30 +388,30 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
         child: Row(
           children: [
             GestureDetector(
-              onTap: () {
-                setState(() {
-                  _taskService.toggleTaskComplete(
-                    widget.project['id'] ?? '',
-                    task['id'],
-                  );
-                });
+              onTap: () async {
+                final taskProvider = context.read<TaskProvider>();
+
+                await taskProvider.changeStatus(
+                  task.id,
+                  task.isCompleted ? 'todo' : 'done',
+                );
               },
               child: Container(
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (task['isCompleted'] ?? false)
+                  color: (task.isCompleted)
                       ? const Color(0xFF10B981)
                       : Colors.transparent,
                   border: Border.all(
-                    color: (task['isCompleted'] ?? false)
+                    color: (task.isCompleted)
                         ? const Color(0xFF10B981)
                         : Colors.grey.shade400,
                     width: 2,
                   ),
                 ),
-                child: (task['isCompleted'] ?? false)
+                child: (task.isCompleted)
                     ? const Icon(
                         Icons.check,
                         color: Colors.white,
@@ -420,14 +428,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    task['title'],
+                    task.title,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: (task['isCompleted'] ?? false)
+                      color: (task.isCompleted)
                           ? Colors.grey.shade500
                           : Colors.black87,
-                      decoration: (task['isCompleted'] ?? false)
+                      decoration: (task.isCompleted)
                           ? TextDecoration.lineThrough
                           : null,
                     ),
@@ -436,7 +444,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
                   Row(
                     children: [
                       Text(
-                        task['date'] ?? '',
+                        task.dueDate != null
+                        ? '${task.dueDate!.day}/${task.dueDate!.month}'
+                        : '',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey.shade500,
@@ -449,16 +459,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: (task['priorityColor'] as Color?)?.withOpacity(0.1) ?? 
+                          color: (task.priorityColor as Color?)?.withOpacity(0.1) ?? 
                                  Colors.orange.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          task['priority'] ?? 'Medium',
+                          task.priority,
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: task['priorityColor'] ?? Colors.orange,
+                            color: task.priorityColor,
                           ),
                         ),
                       ),
@@ -474,7 +484,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 image: DecorationImage(
-                  image: NetworkImage(task['assignee'] ?? 'https://i.pravatar.cc/150?img=11'),
+                  image: NetworkImage(task.assigneeId ?? 'https://i.pravatar.cc/150?img=11'),
                   fit: BoxFit.cover,
                 ),
               ),

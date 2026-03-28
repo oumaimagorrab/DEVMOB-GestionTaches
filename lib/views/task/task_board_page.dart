@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:gestiontaches/services/task_service.dart';
 import 'package:gestiontaches/views/task/task_detail_page.dart';
+import 'package:provider/provider.dart';
+import 'package:gestiontaches/providers/task_provider.dart';
+import 'package:gestiontaches/models/project.dart';
+import 'package:gestiontaches/models/task.dart';
+
 
 class KanbanBoardPage extends StatefulWidget {
-  final Map<String, dynamic>? project;
+  final ProjectModel project;
 
   const KanbanBoardPage({
     super.key,
-    this.project,
+    required this.project,
   });
 
   @override
@@ -15,18 +19,14 @@ class KanbanBoardPage extends StatefulWidget {
 }
 
 class _KanbanBoardPageState extends State<KanbanBoardPage> {
-  final TaskService _taskService = TaskService();
-
-  List<Map<String, dynamic>> get tasks => 
-      _taskService.getTasks(widget.project?['id'] ?? '');
 
   @override
   Widget build(BuildContext context) {
-    final todoTasks = tasks.where((t) => 
-        t['status'] == 'todo' && (t['isCompleted'] != true)).toList();
-    final inProgressTasks = tasks.where((t) => t['status'] == 'inprogress').toList();
-    final doneTasks = tasks.where((t) => 
-        t['isCompleted'] == true || t['status'] == 'done').toList();
+    final taskProvider = context.watch<TaskProvider>();
+
+    final todoTasks = taskProvider.todoTasks;
+    final inProgressTasks = taskProvider.inProgressTasks;
+    final doneTasks = taskProvider.doneTasks;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -34,7 +34,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          widget.project?['title'] ?? 'Tableau Kanban',
+          widget.project.title,
           style: const TextStyle(
             color: Colors.black87,
             fontSize: 18,
@@ -89,7 +89,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
     required int count,
     required Color countColor,
     required Color columnColor,
-    required List<Map<String, dynamic>> tasks,
+    required List<TaskModel> tasks,
   }) {
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -165,12 +165,12 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
     );
   }
 
-  Widget _buildTaskCard(Map<String, dynamic> task) {
+  Widget _buildTaskCard(TaskModel task) {
     // Déterminer le statut textuel
     String statusText;
-    if (task['isCompleted'] == true || task['status'] == 'done') {
+    if (task.isCompleted == true || task.status == 'done') {
       statusText = 'Terminé';
-    } else if (task['status'] == 'inprogress') {
+    } else if (task.status == 'inprogress') {
       statusText = 'En cours';
     } else {
       statusText = 'À faire';
@@ -184,7 +184,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
           MaterialPageRoute(
             builder: (context) => TaskDetailPage(
               task: task,
-              projectTitle: widget.project?['title'] ?? 'Projet',
+              projectTitle: widget.project.title,
             ),
           ),
         );
@@ -209,32 +209,31 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: (task['priorityColor'] as Color?)?.withOpacity(0.12) ??
-                       Colors.orange.withOpacity(0.12),
+                color: (task.priorityColor ?? Colors.orange).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                task['priority'] ?? 'Medium',
+                task.priority,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: task['priorityColor'] ?? Colors.orange,
+                  color: task.priorityColor ?? Colors.orange,
                 ),
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              task['title'] ?? '',
+              task.title ?? '',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Colors.black87,
               ),
             ),
-            if (task['description']?.isNotEmpty ?? false) ...[
+            if (task.description?.isNotEmpty ?? false) ...[
               const SizedBox(height: 6),
               Text(
-                task['description'],
+                task.description!,
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey.shade600,
@@ -254,14 +253,14 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     image: DecorationImage(
-                      image: NetworkImage(task['assignee'] ?? 'https://i.pravatar.cc/150?img=11'),
+                      image: NetworkImage(task.assigneeId ?? 'https://i.pravatar.cc/150?img=11'),
                       fit: BoxFit.cover,
                     ),
                   ),
                 ),
                 Row(
                   children: [
-                    if ((task['comments'] ?? 0) > 0) ...[
+                    if (task.comments.isNotEmpty) ...[
                       Icon(
                         Icons.chat_bubble_outline,
                         size: 14,
@@ -269,7 +268,7 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        task['comments'].toString(),
+                        task.comments.toString(),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade500,
@@ -284,7 +283,9 @@ class _KanbanBoardPageState extends State<KanbanBoardPage> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      task['date'] ?? '',
+                      task.dueDate != null
+                      ? '${task.dueDate!.day}/${task.dueDate!.month}'
+                      : '',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade500,

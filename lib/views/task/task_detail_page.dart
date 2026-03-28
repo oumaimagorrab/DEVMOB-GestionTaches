@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:gestiontaches/models/task.dart';
 
 class TaskDetailPage extends StatefulWidget {
-  final Map<String, dynamic> task;
+  final TaskModel task;
   final String projectTitle;
 
   const TaskDetailPage({
@@ -17,7 +18,7 @@ class TaskDetailPage extends StatefulWidget {
 
 class _TaskDetailPageState extends State<TaskDetailPage> {
   late String _currentStatus;
-  late Map<String, dynamic> _task;
+  late TaskModel _task;
 
   final List<Map<String, String>> statusOptions = [
     {'value': 'todo', 'label': 'À faire', 'color': 'grey'},
@@ -28,9 +29,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   @override
   void initState() {
     super.initState();
-    _task = Map.from(widget.task);
-    _currentStatus = _task['status'] ?? 'todo';
-    if (_task['isCompleted'] == true) {
+    late TaskModel _task;
+    _task = widget.task;
+    _currentStatus = _task.status;
+    if (_task.isCompleted) {
       _currentStatus = 'done';
     }
   }
@@ -133,8 +135,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     onTap: () {
                       setState(() {
                         _currentStatus = status['value']!;
-                        _task['status'] = _currentStatus;
-                        _task['isCompleted'] = _currentStatus == 'done';
+                      _task = _task.copyWith(
+                        status: _currentStatus,
+                        isCompleted: _currentStatus == 'done',
+                      );
                       });
                       Navigator.pop(context);
                     },
@@ -150,13 +154,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final priorityColor = _task['priorityColor'] as Color? ?? Colors.orange;
-    final priorityLabel = _task['priority'] ?? 'Medium';
-    final assigneeName = _task['assigneeName'] ?? 'Non assigné';
-    final assigneeImage = _task['assignee'] ?? 'https://i.pravatar.cc/150?img=11';
-    final date = _task['date'] ?? 'Non définie';
-    final createdAt = _task['createdAt'] != null
-        ? DateFormat('d MMMM yyyy', 'fr_FR').format(DateTime.parse(_task['createdAt']))
+    final priorityColor = _task.priorityColor as Color? ?? Colors.orange;
+    final priorityLabel = _task.priority;
+    final assigneeName = _task.assigneeId ?? 'Non assigné';
+    final assigneeImage = _task.assigneeId ?? 'https://i.pravatar.cc/150?img=11';
+    final date = _task.dueDate != null ? DateFormat('d MMM').format(_task.dueDate!) : 'Non définie';
+    final createdAt = _task.createdAt != null
+        ? DateFormat('d MMMM yyyy', 'fr_FR').format(_task.createdAt)
         : 'Date inconnue';
 
     return Scaffold(
@@ -282,7 +286,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               
               // Title dynamique
               Text(
-                _task['title'] ?? 'Sans titre',
+                _task.title ,
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -294,9 +298,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               
               // Description dynamique
               Text(
-                _task['description']?.isNotEmpty == true
-                    ? _task['description']
-                    : 'Aucune description',
+                _task.description ?? 'Aucune description',
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.grey[600],
