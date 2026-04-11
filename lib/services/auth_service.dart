@@ -60,6 +60,7 @@ class AuthService {
         photoURL: imageUrl,
         createdAt: DateTime.now(),
         isActive: true,
+        role: 'user',  // Rôle par défaut
       );
 
       // 4. Sauvegarder dans Firestore avec serverTimestamp
@@ -70,6 +71,7 @@ class AuthService {
         'photoURL': imageUrl,
         'createdAt': FieldValue.serverTimestamp(),  // Timestamp Firestore
         'isActive': true,
+        'role': 'user',  // Rôle par défaut
       });
 
       return userModel;
@@ -106,6 +108,7 @@ class AuthService {
             photoURL: result.user!.photoURL,
             createdAt: DateTime.now(),
             isActive: true,
+            role: 'user',  // Rôle par défaut
           );
           
           await _firestore.collection('users').doc(result.user!.uid).set({
@@ -115,6 +118,7 @@ class AuthService {
             'photoURL': userModel.photoURL,
             'createdAt': FieldValue.serverTimestamp(),
             'isActive': true,
+            'role': 'user',  // Rôle par défaut
           });
           
           return userModel;
@@ -171,6 +175,7 @@ class AuthService {
           photoURL: data['photoURL'] ?? data['avatar'],
           createdAt: createdAt,
           isActive: data['isActive'] ?? true,
+          role: data['role'] ?? 'user',  // Valeur par défaut si non définie
         );
       }
       return null;
@@ -179,6 +184,64 @@ class AuthService {
       return null;
     }
   }
+  // Dans class AuthService, ajoutez :
+
+// ✅ NOUVEAU : Récupérer un utilisateur par ID (rendre publique la méthode existante)
+Future<UserModel?> getUserFromFirestore(String uid) async {
+  return _getUserFromFirestore(uid); // Appelle votre méthode privée existante
+}
+
+// ✅ NOUVEAU : Mettre à jour le rôle d'un utilisateur
+Future<void> updateUserRole(String uid, String newRole) async {
+  try {
+    await _firestore.collection('users').doc(uid).update({
+      'role': newRole,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    throw Exception('Erreur mise à jour rôle: $e');
+  }
+}
+
+// ✅ NOUVEAU : Créer un utilisateur admin (pour setup initial)
+Future<UserModel?> createAdminUser({
+  required String name,
+  required String email,
+  required String password,
+}) async {
+  try {
+    final UserCredential result = await _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
+
+    if (result.user == null) throw Exception('Échec création utilisateur');
+
+    await result.user!.updateDisplayName(name.trim());
+
+    final userModel = UserModel(
+      id: result.user!.uid,
+      name: name.trim(),
+      email: email.trim(),
+      createdAt: DateTime.now(),
+      isActive: true,
+      role: 'admin', // ✅ Rôle admin
+    );
+
+    await _firestore.collection('users').doc(result.user!.uid).set({
+      'id': result.user!.uid,
+      'name': name.trim(),
+      'email': email.trim(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'isActive': true,
+      'role': 'admin', // ✅ Rôle admin
+    });
+
+    return userModel;
+  } on FirebaseAuthException catch (e) {
+    throw _handleAuthException(e);
+  }
+}
 
   // Convertir Firebase User en UserModel
   UserModel _userToUserModel(User user) {
@@ -189,6 +252,7 @@ class AuthService {
       photoURL: user.photoURL,
       createdAt: DateTime.now(),
       isActive: true,
+      role: 'user',  // Rôle par défaut
     );
   }
 

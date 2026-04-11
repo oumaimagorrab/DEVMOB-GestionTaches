@@ -4,15 +4,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'create_project_page.dart'; 
 import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
 
-class AdminDashboardPage extends StatefulWidget {
+class DashboardPage extends StatefulWidget {
   
-  const AdminDashboardPage({super.key});
+  const DashboardPage({super.key});
 
   @override
-  State<AdminDashboardPage> createState() => _AdminDashboardPageState();
+  State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _AdminDashboardPageState extends State<AdminDashboardPage> {
+class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
 
 

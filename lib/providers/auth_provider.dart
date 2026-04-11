@@ -1,27 +1,31 @@
 // providers/auth_provider.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/user.dart';  // UserModel
+import '../models/user.dart';
 import '../services/auth_service.dart';
 
 class AppAuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   
-  UserModel? _user;  // ✅ Changé de Member à UserModel
+  UserModel? _user;
   bool _isLoading = false;
   String? _error;
 
-  // Getters
-  UserModel? get user => _user;  // ✅ Renommé de member à user
+  // Getters existants
+  UserModel? get user => _user;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _user != null;
   bool get isLoggedIn => _authService.currentUser != null;
 
+  // ✅ NOUVEAUX : Getters pour les rôles
+  bool get isAdmin => _user?.isAdmin ?? false;
+  bool get isCollaborator => _user?.isRegularUser ?? false; // ou isUser
+
   // Stream d'authentification
   Stream<User?> get authStateChanges => _authService.authStateChanges;
 
-  // Connexion Email
+  // Connexion Email - ✅ MODIFIÉ : Récupère le rôle depuis Firestore
   Future<bool> signInWithEmail(String email, String password) async {
     _setLoading(true);
     _clearError();
@@ -29,7 +33,7 @@ class AppAuthProvider extends ChangeNotifier {
     try {
       final result = await _authService.signInWithEmail(email, password);
       if (result != null) {
-        _user = result;  // ✅ UserModel
+        _user = result;
         _setLoading(false);
         notifyListeners();
         return true;
@@ -42,7 +46,7 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
-  // Inscription
+  // Inscription - ✅ MODIFIÉ : Garde le rôle 'user' par défaut
   Future<bool> signUp({
     required String name,
     required String email,
@@ -60,7 +64,7 @@ class AppAuthProvider extends ChangeNotifier {
         imageUrl: imageUrl,
       );
       if (result != null) {
-        _user = result;  // ✅ UserModel
+        _user = result; // Rôle 'user' par défaut depuis AuthService
         _setLoading(false);
         notifyListeners();
         return true;
@@ -73,7 +77,7 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
-  // Connexion Google
+  // Connexion Google - ✅ DÉJÀ GÉRÉ (rôle récupéré depuis Firestore si existant)
   Future<bool> signInWithGoogle() async {
     _setLoading(true);
     _clearError();
@@ -81,7 +85,7 @@ class AppAuthProvider extends ChangeNotifier {
     try {
       final result = await _authService.signInWithGoogle();
       if (result != null) {
-        _user = result;  // ✅ UserModel
+        _user = result;
         _setLoading(false);
         notifyListeners();
         return true;
@@ -126,21 +130,47 @@ class AppAuthProvider extends ChangeNotifier {
     }
   }
 
-  // Charger le profil utilisateur courant
+  // ✅ MODIFIÉ : Charger l'utilisateur depuis Firestore (pas juste Firebase Auth)
   Future<void> loadCurrentUser() async {
-    final firebaseUser = _authService.currentUser;
-    if (firebaseUser != null) {
-      _user = UserModel(  // ✅ UserModel
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName ?? '',
-        email: firebaseUser.email ?? '',
-        photoURL: firebaseUser.photoURL,
-        createdAt: DateTime.now(),
-        isActive: true,
-      );
-      notifyListeners();
+    _setLoading(true);
+    try {
+      final firebaseUser = _authService.currentUser;
+      if (firebaseUser != null) {
+        // Récupérer les données complètes depuis Firestore pour avoir le rôle
+        final userModel = await _authService.getUserFromFirestore(firebaseUser.uid);
+        _user = userModel ?? UserModel(
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName ?? '',
+          email: firebaseUser.email ?? '',
+          photoURL: firebaseUser.photoURL,
+          createdAt: DateTime.now(),
+          isActive: true,
+          role: 'user',
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
     }
   }
+
+  // ✅ NOUVEAU : Mettre à jour le rôle (pour l'admin)
+  Future<void> updateUserRole(String newRole) async {
+    if (_user == null) return;
+    
+    try {
+      await _authService.updateUserRole(_user!.id, newRole);
+      _user = _user!.copyWith(role: newRole);
+      notifyListeners();
+    } catch (e) {
+      _setError(e.toString());
+    }
+  }
+
+  // ✅ NOUVEAU : Vérifier l'accès à une fonctionnalité admin
+  bool canAccessAdminFeature() => isAdmin;
 
   // Helpers privés
   void _setLoading(bool value) {

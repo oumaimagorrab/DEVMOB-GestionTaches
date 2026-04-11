@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'register_page.dart';
 import 'package:gestiontaches/views/project/dashboard_page.dart';
+import 'package:gestiontaches/views/project/userDashboard.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 
@@ -10,8 +11,6 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const LoginScreen();
-    
-
   }
 }
 
@@ -25,13 +24,12 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   bool _obscurePassword = true;
-  
+  bool _rememberMe = false; // ← AJOUTÉ : case à cocher
   
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  
   late AnimationController _logoController;
   late Animation<double> _pulseAnimation;
 
@@ -67,11 +65,19 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     if (success && mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardPage()),
-        (route) => false,
-      );
+      if (authProvider.isAdmin) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+          (route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+          (route) => false,
+        );
+      }
     } else {
       _showError(authProvider.error ?? 'Erreur de connexion');
     }
@@ -317,27 +323,37 @@ class _LoginScreenState extends State<LoginScreen>
                   
                   const SizedBox(height: 12),
                   
-                  // Mot de passe oublié
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => _resetPassword(),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 0),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  // ✅ AJOUTÉ : Case "Se souvenir de moi"
+                  Row(
+                    children: [
+                      SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: Checkbox(
+                          value: _rememberMe,
+                          onChanged: (value) {
+                            setState(() {
+                              _rememberMe = value ?? false;
+                            });
+                          },
+                          activeColor: const Color(0xFF5B5BD6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
                       ),
-                      child: const Text(
-                        'Mot de passe oublié ?',
+                      const SizedBox(width: 8),
+                      Text(
+                        'Se souvenir de moi',
                         style: TextStyle(
-                          color: Color(0xFF5B5BD6),
+                          color: Colors.grey.shade700,
                           fontSize: 13,
                         ),
                       ),
-                    ),
+                    ],
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   
                   // Bouton Se connecter
                   SizedBox(
@@ -370,6 +386,28 @@ class _LoginScreenState extends State<LoginScreen>
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // 🔻 DÉPLACÉ : Mot de passe oublié sous le bouton
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => _resetPassword(),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Mot de passe oublié ?',
+                        style: TextStyle(
+                          color: Color(0xFF5B5BD6),
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ),
                   
@@ -426,7 +464,6 @@ class _LoginScreenState extends State<LoginScreen>
                           'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png',
                           height: 24,
                           errorBuilder: (context, error, stackTrace) {
-                            // Fallback si l'image ne charge pas
                             return Container(
                               width: 24,
                               height: 24,
@@ -498,7 +535,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // Réinitialisation du mot de passe
   Future<void> _resetPassword() async {
     if (_emailController.text.isEmpty) {
       _showError('Veuillez entrer votre email d\'abord');

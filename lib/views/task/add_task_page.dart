@@ -26,6 +26,13 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
   bool _notifyOnComplete = false;
   bool _isSaving = false;
 
+  // ✅ MÉTHODE AJOUTÉE - Vérifie si le formulaire est valide
+  bool _isFormValid() {
+    return _titleController.text.isNotEmpty &&
+           _descriptionController.text.isNotEmpty &&
+           _selectedDate != null;
+  }
+
   final List<Map<String, dynamic>> assignees = [
     {'name': 'Bob Durand', 'image': 'https://i.pravatar.cc/150?img=2'},
     {'name': 'Alice Martin', 'image': 'https://i.pravatar.cc/150?img=1'},
@@ -38,6 +45,10 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
   void initState() {
     super.initState();
     _selectedAssignee = assignees.first['name'];
+    
+    // ✅ AJOUTÉ - Listeners pour mettre à jour l'état quand le texte change
+    _titleController.addListener(() => setState(() {}));
+    _descriptionController.addListener(() => setState(() {}));
   }
 
   @override
@@ -89,18 +100,22 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
 
     final taskProvider = context.read<TaskProvider>();
 
+    print('🚀 Saving task dans projectId: ${widget.projectId}');
+    
     // CRÉATION VIA TASK PROVIDER → FIRESTORE
     final task = await taskProvider.createTask(
       projectId: widget.projectId,
       title: _titleController.text,
       description: _descriptionController.text,
       priority: _selectedPriority.toLowerCase(),
-      createdBy: 'currentUserId', // TODO: Remplacer par l'ID réel de l'utilisateur
+      createdBy: 'currentUserId',
       assigneeId: assigneeData['image'],
       dueDate: _selectedDate,
     );
 
     setState(() => _isSaving = false);
+
+    print('📌 Task result: ${task != null ? "created" : "failed"}');
 
     if (task != null) {
       // Notification si activée
@@ -161,31 +176,25 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _saveTask,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6B4EFF),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 0,
-              ),  
+            child: GestureDetector(
+              onTap: (_isSaving || !_isFormValid()) ? null : _saveTask,
               child: _isSaving
                   ? const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6B4EFF)),
                       ),
                     )
-                  : const Text(
+                  : Text(
                       'Enregistrer',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
+                        color: _isFormValid() 
+                            ? const Color(0xFF6B4EFF)  // ✅ Mauve quand actif
+                            : Colors.grey.shade400,     // ✅ Gris quand inactif
                       ),
                     ),
             ),

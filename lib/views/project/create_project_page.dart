@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:gestiontaches/models/user.dart'; 
 import 'package:gestiontaches/providers/project_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CreateProjectPage extends StatefulWidget {
   const CreateProjectPage({super.key});
@@ -212,6 +213,12 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       return;
     }
 
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      _showSnackBar('Erreur: Utilisateur non connecté');
+      return;
+    }
+
     final provider = Provider.of<ProjectProvider>(context, listen: false);
     final members = invitedMembers.map((m) => m.id).toList();
 
@@ -220,7 +227,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
-      createdBy: 'user_id_courant',
+      createdBy: currentUserId,
       members: members,
       color: projectColors[_selectedColorIndex].value.toRadixString(16),
     );
@@ -636,7 +643,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
             // Membres suggérés (enregistrés)
             if (recentMembers.isNotEmpty) ...[
               const Text(
-                'Suggestions',
+                'Membres récents',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.black87,

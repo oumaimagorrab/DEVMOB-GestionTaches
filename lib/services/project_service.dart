@@ -51,8 +51,23 @@ class ProjectService {
     });
   }
 
-  // Récupérer les projets d'un utilisateur spécifique
+  // Récupérer les projets créés ou auxquels l'utilisateur appartient
   Stream<List<ProjectModel>> getUserProjects(String userId) {
+    return _firestore
+        .collection(_collection)
+        .where('createdBy', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      final createdProjects = snapshot.docs
+          .map((doc) => ProjectModel.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+      return createdProjects;
+    });
+  }
+
+  // Récupérer les projets auxquels l'utilisateur est membre
+  Stream<List<ProjectModel>> getSharedProjects(String userId) {
     return _firestore
         .collection(_collection)
         .where('members', arrayContains: userId)

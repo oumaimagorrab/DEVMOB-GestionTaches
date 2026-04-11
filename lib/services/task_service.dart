@@ -35,9 +35,15 @@ class TaskService {
         dueDate: dueDate,
       );
 
+      print('💾 Création tâche: $title (projectId: $projectId)');
+      print('📊 Task toJson: ${task.toJson()}');
+      
       await docRef.set(task.toJson());
+      
+      print('✅ Tâche créée avec ID: ${docRef.id}');
       return task;
     } catch (e) {
+      print('❌ Erreur création: $e');
       throw Exception('Erreur création tâche: $e');
     }
   }
@@ -47,11 +53,32 @@ class TaskService {
     return _firestore
         .collection(_collection)
         .where('projectId', isEqualTo: projectId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TaskModel.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
+        .map((snapshot) {
+          try {
+            print('📦 Snapshot reçu: ${snapshot.docs.length} documents');
+            
+            final tasks = <TaskModel>[];
+            for (var doc in snapshot.docs) {
+              try {
+                final data = {...doc.data(), 'id': doc.id};
+                print('📄 Doc ${doc.id}: $data');
+                final task = TaskModel.fromJson(data);
+                tasks.add(task);
+              } catch (e) {
+                print('❌ Erreur parsing doc ${doc.id}: $e');
+              }
+            }
+            
+            print('✅ ${tasks.length} tâches parsées');
+            // Trier localement
+            tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            return tasks;
+          } catch (e) {
+            print('❌ Erreur map stream: $e');
+            return [];
+          }
+        });
   }
 
   // Récupérer les tâches assignées à un utilisateur
@@ -59,11 +86,21 @@ class TaskService {
     return _firestore
         .collection(_collection)
         .where('assigneeId', isEqualTo: userId)
-        .orderBy('dueDate')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => TaskModel.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
+        .map((snapshot) {
+          final tasks = snapshot.docs
+              .map((doc) => TaskModel.fromJson({...doc.data(), 'id': doc.id}))
+              .toList();
+          
+          // Trier localement par dueDate
+          tasks.sort((a, b) {
+            if (a.dueDate == null && b.dueDate == null) return 0;
+            if (a.dueDate == null) return 1;
+            if (b.dueDate == null) return -1;
+            return a.dueDate!.compareTo(b.dueDate!);
+          });
+          return tasks;
+        });
   }
 
   // Récupérer une tâche par ID

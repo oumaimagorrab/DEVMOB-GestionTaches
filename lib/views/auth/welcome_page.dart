@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';  // ← AJOUTÉ
-import 'package:gestiontaches/providers/auth_provider.dart';
-import 'login_page.dart';  // ← AJOUTÉ
-import 'register_page.dart';  // ← AJOUTÉ
+import 'login_page.dart';  // ← AJOUTÉ pour la redirection
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -13,11 +9,15 @@ class WelcomePage extends StatefulWidget {
 }
 
 class _WelcomePageState extends State<WelcomePage>
-    with SingleTickerProviderStateMixin {
+  with TickerProviderStateMixin{
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _scaleAnimation;
+  
+  // Contrôleur pour la barre de progression
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
 
   @override
   void initState() {
@@ -48,12 +48,41 @@ class _WelcomePageState extends State<WelcomePage>
       curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
     ));
 
+    // Animation de la barre de progression (3 secondes)
+    _progressController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    );
+
+    _progressAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _progressController,
+      curve: Curves.easeInOut,
+    ));
+
     _controller.forward();
+    _progressController.forward();
+
+    // 🔄 REDIRECTION AUTOMATIQUE vers LoginPage après le chargement
+    _progressController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const LoginPage(),
+            ),
+          );
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -75,11 +104,12 @@ class _WelcomePageState extends State<WelcomePage>
                   position: _slideAnimation,
                   child: Container(
                     width: double.infinity,
+                    // 📐 CARRÉ PLUS GRAND : 85% de la hauteur de l'écran
                     constraints: BoxConstraints(
-                      maxWidth: 400,
-                      minHeight: size.height * 0.6,
+                      maxWidth: 450,
+                      minHeight: size.height * 0.85,
                     ),
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(40),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(32),
@@ -99,128 +129,129 @@ class _WelcomePageState extends State<WelcomePage>
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Logo animé avec effet de pulsation
-                        ScaleTransition(
-                          scale: _scaleAnimation,
-                          child: _AnimatedLogo(),
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Titre avec dégradé
-                        ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(
-                            colors: [Color(0xFF5B5BD6), Color(0xFF8B5CF6)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ).createShader(bounds),
-                          child: const Text(
-                            "Bienvenue",
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
+                        // Partie supérieure : Logo et contenu
+                        Column(
+                          children: [
+                            const SizedBox(height: 40),
+                            
+                            // Logo animé avec effet de pulsation
+                            ScaleTransition(
+                              scale: _scaleAnimation,
+                              child: _AnimatedLogo(),
                             ),
-                          ),
-                        ),
 
-                        const SizedBox(height: 12),
+                            const SizedBox(height: 40),
 
-                        // Description améliorée
-                        Text(
-                          "Gérez vos projets et collaborez efficacement avec votre équipe en temps réel.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 15,
-                            height: 1.5,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        // Points forts (valeurs ajoutées)
-                        _FeatureRow(
-                          icon: Icons.people_outline,
-                          text: "Collaboration en équipe",
-                          delay: 400,
-                        ),
-                        const SizedBox(height: 12),
-                        _FeatureRow(
-                          icon: Icons.insights_outlined,
-                          text: "Suivi de projets avancé",
-                          delay: 500,
-                        ),
-                        const SizedBox(height: 12),
-                        _FeatureRow(
-                          icon: Icons.security_outlined,
-                          text: "Sécurité entreprise",
-                          delay: 600,
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        // 🔘 Bouton Se connecter - NAVIGATION CORRIGÉE
-                        _AnimatedButton(
-                          text: "Se connecter",
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChangeNotifierProvider.value(
-                                value: Provider.of<AppAuthProvider>(context, listen: false),
-                                child: const LoginPage(),
+                            // Titre avec dégradé
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [Color(0xFF5B5BD6), Color(0xFF8B5CF6)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ).createShader(bounds),
+                              child: const Text(
+                                "Co-Work Pro",
+                                style: TextStyle(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
                             ),
-                          );
-                        },
-                          isPrimary: true,
-                        ),
 
-                        const SizedBox(height: 16),
+                            const SizedBox(height: 16),
 
-                        // 🔘 Bouton S'inscrire - NAVIGATION CORRIGÉE
-                        _AnimatedButton(
-                          text: "S'inscrire",
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            // ✅ SOLUTION 1 : Navigation simple qui préserve le Provider
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterPage(),
+                            // Description
+                            Text(
+                              "Gérez vos projets et collaborez efficacement avec votre équipe en temps réel.",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 16,
+                                height: 1.5,
+                                letterSpacing: 0.2,
                               ),
-                            );
-                          },
-                          isPrimary: false,
+                            ),
+
+                            const SizedBox(height: 50),
+
+                            // Points forts
+                            _FeatureRow(
+                              icon: Icons.people_outline,
+                              text: "Collaboration en équipe",
+                              delay: 400,
+                            ),
+                            const SizedBox(height: 16),
+                            _FeatureRow(
+                              icon: Icons.insights_outlined,
+                              text: "Suivi de projets avancé",
+                              delay: 500,
+                            ),
+                            const SizedBox(height: 16),
+                            _FeatureRow(
+                              icon: Icons.security_outlined,
+                              text: "Sécurité entreprise",
+                              delay: 600,
+                            ),
+                          ],
                         ),
 
-                        const SizedBox(height: 24),
-
-                        // Lien "Continuer en tant qu'invité"
-                        TextButton(
-                          onPressed: () {
-                            // Navigation invité
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.grey.shade500,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
+                        // 🔻 BARRE DE PROGRESSION LINÉAIRE EN BAS
+                        Column(
+                          children: [
+                            const SizedBox(height: 60),
+                            
+                            // Texte de chargement
+                            Text(
+                              "Chargement...",
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
-                          child: const Text(
-                            "Continuer en tant qu'invité →",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                            
+                            const SizedBox(height: 12),
+                            
+                            // Barre de progression animée avec dégradé
+                            AnimatedBuilder(
+                              animation: _progressAnimation,
+                              builder: (context, child) {
+                                return Container(
+                                  width: double.infinity,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: _progressAnimation.value,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFF5B5BD6), Color(0xFF8B5CF6)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(3),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFF5B5BD6).withOpacity(0.4),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
+                            
+                            const SizedBox(height: 40),
+                          ],
                         ),
                       ],
                     ),
@@ -266,8 +297,8 @@ class _AnimatedLogoState extends State<_AnimatedLogo>
       animation: _pulseController,
       builder: (context, child) {
         return Container(
-          width: 100,
-          height: 100,
+          width: 120,
+          height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
@@ -284,15 +315,15 @@ class _AnimatedLogoState extends State<_AnimatedLogo>
             alignment: Alignment.center,
             children: [
               Container(
-                width: 90,
-                height: 90,
+                width: 110,
+                height: 110,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFF5B5BD6).withOpacity(0.3),
@@ -304,15 +335,15 @@ class _AnimatedLogoState extends State<_AnimatedLogo>
                 child: const Icon(
                   Icons.folder_outlined,
                   color: Colors.white,
-                  size: 44,
+                  size: 52,
                 ),
               ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Colors.amber, Colors.orange],
@@ -332,7 +363,7 @@ class _AnimatedLogoState extends State<_AnimatedLogo>
                   child: const Icon(
                     Icons.bolt,
                     color: Colors.white,
-                    size: 18,
+                    size: 20,
                   ),
                 ),
               ),
@@ -408,111 +439,28 @@ class _FeatureRowState extends State<_FeatureRow>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: const Color(0xFF5B5BD6).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 widget.icon,
                 color: const Color(0xFF5B5BD6),
-                size: 20,
+                size: 22,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Text(
               widget.text,
               style: TextStyle(
                 color: Colors.grey.shade700,
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// 🔘 Bouton animé avec effet de vague et feedback haptique
-class _AnimatedButton extends StatefulWidget {
-  final String text;
-  final VoidCallback onPressed;
-  final bool isPrimary;
-
-  const _AnimatedButton({
-    required this.text,
-    required this.onPressed,
-    required this.isPrimary,
-  });
-
-  @override
-  State<_AnimatedButton> createState() => _AnimatedButtonState();
-}
-
-class _AnimatedButtonState extends State<_AnimatedButton> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final button = widget.isPrimary
-        ? ElevatedButton(
-            onPressed: widget.onPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF5B5BD6),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-              shadowColor: const Color(0xFF5B5BD6).withOpacity(0.4),
-            ).copyWith(
-              overlayColor: WidgetStateProperty.all(Colors.white.withOpacity(0.2)),
-            ),
-            child: Text(
-              widget.text,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          )
-        : OutlinedButton(
-            onPressed: widget.onPressed,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF5B5BD6),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              side: const BorderSide(color: Color(0xFF5B5BD6), width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ).copyWith(
-              overlayColor: WidgetStateProperty.all(
-                const Color(0xFF5B5BD6).withOpacity(0.1),
-              ),
-            ),
-            child: Text(
-              widget.text,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-          );
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      width: double.infinity,
-      transform: Matrix4.identity()..scale(_isPressed ? 0.98 : 1.0),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) => setState(() => _isPressed = false),
-        onTapCancel: () => setState(() => _isPressed = false),
-        child: button,
       ),
     );
   }

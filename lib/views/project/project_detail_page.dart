@@ -5,6 +5,7 @@ import 'package:gestiontaches/models/project.dart';
 import 'package:provider/provider.dart';
 import 'package:gestiontaches/providers/task_provider.dart';
 import 'package:gestiontaches/models/task.dart';
+import 'package:gestiontaches/views/task/task_detail_page.dart';
 
 class ProjectDetailPage extends StatefulWidget {
   final ProjectModel project;
@@ -26,6 +27,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage>
   void initState() {
     super.initState();
 
+    print('📂 ProjectDetailPage initState - projectId: ${widget.project.id}');
+    
     final taskProvider = context.read<TaskProvider>();
     taskProvider.initProjectTasksStream(widget.project.id);
 
@@ -253,6 +256,11 @@ final stats = taskProvider.stats;
                 );
 
                   if (result == true && mounted) {
+                  print('🔄 Rafraîchissement du stream après création');
+                  // Rafraîchir le stream pour voir la nouvelle tâche
+                  final taskProvider = context.read<TaskProvider>();
+                  taskProvider.initProjectTasksStream(widget.project.id);
+                  
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Tâche créée avec succès'),
@@ -361,7 +369,7 @@ final stats = taskProvider.stats;
     );
   }
 
-  Widget _buildTaskItem(TaskModel task) {
+    Widget _buildTaskItem(TaskModel task) {
     return Dismissible(
       key: Key('task_${task.id}'),
       direction: DismissDirection.endToStart,
@@ -378,118 +386,95 @@ final stats = taskProvider.stats;
           final taskProvider = context.read<TaskProvider>();
           await taskProvider.deleteTask(task.id);
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: () async {
-                final taskProvider = context.read<TaskProvider>();
-
-                await taskProvider.changeStatus(
-                  task.id,
-                  task.isCompleted ? 'todo' : 'done',
-                );
-              },
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: (task.isCompleted)
-                      ? const Color(0xFF10B981)
-                      : Colors.transparent,
-                  border: Border.all(
-                    color: (task.isCompleted)
-                        ? const Color(0xFF10B981)
-                        : Colors.grey.shade400,
-                    width: 2,
-                  ),
-                ),
-                child: (task.isCompleted)
-                    ? const Icon(
-                        Icons.check,
-                        color: Colors.white,
-                        size: 16,
-                      )
-                    : null,
-              ),
+      child: GestureDetector(
+        onTap: () {
+          // ✅ NAVIGATION VERS TASK DETAIL PAGE au lieu de changer le statut
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TaskDetailPage(task: task, projectTitle: widget.project.title),
             ),
-
-            const SizedBox(width: 16),
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: (task.isCompleted)
-                          ? Colors.grey.shade500
-                          : Colors.black87,
-                      decoration: (task.isCompleted)
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Text(
-                        task.dueDate != null
-                        ? '${task.dueDate!.day}/${task.dueDate!.month}'
-                        : '',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade500,
-                        ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              // ✅ AUCUN CHECKBOX - Le texte est directement cliquable
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: (task.isCompleted)
+                            ? Colors.grey.shade500
+                            : Colors.black87,
+                        decoration: (task.isCompleted)
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (task.priorityColor as Color?)?.withOpacity(0.1) ?? 
-                                 Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          task.priority,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          task.dueDate != null
+                          ? '${task.dueDate!.day}/${task.dueDate!.month}'
+                          : '',
                           style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: task.priorityColor,
+                            fontSize: 13,
+                            color: Colors.grey.shade500,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                image: DecorationImage(
-                  image: NetworkImage(task.assigneeId ?? 'https://i.pravatar.cc/150?img=11'),
-                  fit: BoxFit.cover,
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (task.priorityColor as Color?)?.withOpacity(0.1) ?? 
+                                   Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            task.priority,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: task.priorityColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              // Cercle avatar conservé
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    image: NetworkImage(task.assigneeId ?? 'https://i.pravatar.cc/150?img=11'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

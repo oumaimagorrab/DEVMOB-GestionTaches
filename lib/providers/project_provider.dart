@@ -35,6 +35,7 @@ class ProjectProvider extends ChangeNotifier {
     _userProjectsStream = _projectService.getUserProjects(userId);
     _userProjectsStream?.listen((projects) {
       _userProjects = projects;
+      _projects = projects;  // Aussi affecter à _projects pour affichage
       notifyListeners();
     });
   }

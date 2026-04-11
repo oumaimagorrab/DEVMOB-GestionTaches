@@ -2,9 +2,10 @@ class UserModel {
   final String id;
   final String name;
   final String email;
-  final String? photoURL;
+  final String? photoURL; // Photo de profil uploadée par l'utilisateur
   final DateTime createdAt;
   final bool isActive;
+  final String role;
 
   UserModel({
     required this.id,
@@ -13,6 +14,7 @@ class UserModel {
     this.photoURL,
     required this.createdAt,
     this.isActive = true,
+    this.role = 'user',
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -20,9 +22,11 @@ class UserModel {
       id: json['id'] ?? json['uid'] ?? '',
       name: json['name'] ?? json['nomComplet'] ?? '',
       email: json['email'] ?? '',
-      photoURL: json['photoURL'] ?? json['avatar'],
+      // Photo uploadée par l'utilisateur (pas d'avatar automatique)
+      photoURL: json['photoURL'],
       createdAt: json['createdAt']?.toDate() ?? DateTime.now(),
       isActive: json['isActive'] ?? true,
+      role: json['role'] ?? 'user',
     );
   }
 
@@ -34,6 +38,7 @@ class UserModel {
       'photoURL': photoURL,
       'createdAt': createdAt.toIso8601String(),
       'isActive': isActive,
+      'role': role,
     };
   }
 
@@ -44,6 +49,7 @@ class UserModel {
     String? photoURL,
     DateTime? createdAt,
     bool? isActive,
+    String? role,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -52,6 +58,10 @@ class UserModel {
       photoURL: photoURL ?? this.photoURL,
       createdAt: createdAt ?? this.createdAt,
       isActive: isActive ?? this.isActive,
+      role: role ?? this.role,
     );
   }
+
+  bool get isAdmin => role == 'admin';
+  bool get isRegularUser => role == 'user';
 }

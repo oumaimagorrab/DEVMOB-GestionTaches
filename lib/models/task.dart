@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TaskModel {
   final String id;
@@ -39,11 +40,19 @@ class TaskModel {
       priority: json['priority'] ?? 'medium',
       createdBy: json['createdBy'] ?? '',
       assigneeId: json['assigneeId'],
-      createdAt: json['createdAt']?.toDate() ?? DateTime.now(),
-      dueDate: json['dueDate']?.toDate(),
+      createdAt: _parseDate(json['createdAt']),
+      dueDate: json['dueDate'] != null ? _parseDate(json['dueDate']) : null,
       isCompleted: json['isCompleted'] ?? false,
       comments: List<String>.from(json['comments'] ?? []),
     );
+  }
+
+  static DateTime _parseDate(dynamic dateValue) {
+    if (dateValue == null) return DateTime.now();
+    if (dateValue is Timestamp) return dateValue.toDate();
+    if (dateValue is DateTime) return dateValue;
+    if (dateValue is String) return DateTime.parse(dateValue);
+    return DateTime.now();
   }
 
   Map<String, dynamic> toJson() {
@@ -56,8 +65,8 @@ class TaskModel {
       'priority': priority,
       'createdBy': createdBy,
       'assigneeId': assigneeId,
-      'createdAt': createdAt.toIso8601String(),
-      'dueDate': dueDate?.toIso8601String(),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
       'isCompleted': isCompleted,
       'comments': comments,
     };

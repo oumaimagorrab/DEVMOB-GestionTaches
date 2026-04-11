@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ProjectModel {
   final String id;
   final String title;
@@ -23,10 +25,18 @@ class ProjectModel {
       title: json['title'] ?? '',
       description: json['description'],
       createdBy: json['createdBy'] ?? '',
-      createdAt: json['createdAt']?.toDate() ?? DateTime.now(),
+      createdAt: _parseDate(json['createdAt']),
       members: List<String>.from(json['members'] ?? []),
       color: json['color'],
     );
+  }
+
+  static DateTime _parseDate(dynamic dateValue) {
+    if (dateValue == null) return DateTime.now();
+    if (dateValue is Timestamp) return dateValue.toDate();
+    if (dateValue is DateTime) return dateValue;
+    if (dateValue is String) return DateTime.parse(dateValue);
+    return DateTime.now();
   }
 
   Map<String, dynamic> toJson() {
@@ -35,7 +45,7 @@ class ProjectModel {
       'title': title,
       'description': description,
       'createdBy': createdBy,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': Timestamp.fromDate(createdAt),
       'members': members,
       'color': color,
     };

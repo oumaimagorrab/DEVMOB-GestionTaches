@@ -6,6 +6,7 @@ import 'package:gestiontaches/views/profile/user_profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:gestiontaches/providers/project_provider.dart';
 import 'package:gestiontaches/models/project.dart'; // Utilisation de ProjectModel
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -22,7 +23,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProjectProvider>().initProjectsStream();
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        context.read<ProjectProvider>().initUserProjectsStream(userId);
+      }
     });
   }
   
@@ -38,25 +42,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header modifié - SEULEMENT NOTIFICATION
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.menu,
-                      color: Colors.black87,
-                      size: 24,
-                    ),
-                  ),
-                  
                   const Text(
                     'Mes Projets',
                     style: TextStyle(
@@ -66,54 +57,23 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     ),
                   ),
                   
-                  Row(
+                  // SEULEMENT LA NOTIFICATION (photo de profil supprimée)
+                  Stack(
                     children: [
-                      Stack(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.notifications_outlined,
-                              color: Colors.black87,
-                              size: 24,
-                            ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const Icon(
+                        Icons.notifications_outlined,
+                        color: Colors.black87,
+                        size: 24,
                       ),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ProfilePage()),
-                          );
-                        },
+                      Positioned(
+                        top: 0,
+                        right: 0,
                         child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
                             shape: BoxShape.circle,
-                            image: const DecorationImage(
-                              image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                              fit: BoxFit.cover,
-                            ),
-                            border: Border.all(color: Colors.white, width: 2),
                           ),
                         ),
                       ),
@@ -419,7 +379,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 _buildNavItem(Icons.folder_outlined, 'Projets', 1),
                 const SizedBox(width: 56),
                 _buildNavItem(Icons.people_outline, 'Équipe', 2),
-                _buildNavItem(Icons.settings_outlined, 'Plus', 3),
+                _buildNavItem(Icons.person_outline, 'Profil', 3), // ✅ REMPLACÉ Plus par Profil
               ],
             ),
           ),
@@ -523,8 +483,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
           case 2:
             Navigator.pushNamed(context, '/team');
             break;
-          case 3:
-            Navigator.pushNamed(context, '/createprojects');
+          case 3: // ✅ NAVIGATION VERS PROFIL
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
             break;
         }
       },
