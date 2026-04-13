@@ -172,7 +172,6 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // Inscription via Provider
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     
@@ -199,8 +198,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (success && mounted) {
       _showSuccess('Compte créé avec succès !');
-      // Optionnel: naviguer vers login ou dashboard
-      Navigator.pop(context); // Retour à la page login
+      Navigator.pop(context);
     } else if (mounted && authProvider.error != null) {
       _showError(authProvider.error!);
     }
@@ -233,9 +231,9 @@ class _RegisterPageState extends State<RegisterPage> {
     final isLoading = context.watch<AppAuthProvider>().isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F6FA), // ← Fond gris clair
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5F6FA), // ← Même couleur que le fond
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -255,266 +253,288 @@ class _RegisterPageState extends State<RegisterPage> {
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  
-                  // Photo de profil
-                  Center(
-                    child: GestureDetector(
-                      onTap: _showImageSourceDialog,
-                      child: Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                              image: _profileImage != null
-                                  ? DecorationImage(
-                                      image: FileImage(_profileImage!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                            ),
-                            child: _profileImage == null
-                                ? Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.grey.shade400,
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                
+                // Photo de profil (hors du container)
+                Center(
+                  child: GestureDetector(
+                    onTap: _showImageSourceDialog,
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            image: _profileImage != null
+                                ? DecorationImage(
+                                    image: FileImage(_profileImage!),
+                                    fit: BoxFit.cover,
                                   )
                                 : null,
                           ),
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
+                          child: _profileImage == null
+                              ? Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Colors.grey.shade400,
+                                )
+                              : null,
+                        ),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF5B5BD6).withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
                               ),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF5B5BD6).withOpacity(0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // 📦 CONTAINER BLANC AVEC OMBRE
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                        spreadRadius: -5,
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // Champs du formulaire
+                        _buildTextField(
+                          controller: _nameController,
+                          hintText: 'Nom complet',
+                          icon: Icons.person_outline,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre nom';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        _buildTextField(
+                          controller: _emailController,
+                          hintText: 'Email',
+                          icon: Icons.email_outlined,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer votre email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                              return 'Email invalide';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        _buildPasswordField(
+                          controller: _passwordController,
+                          hintText: 'Mot de passe',
+                          obscureText: _obscurePassword,
+                          onToggle: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez entrer un mot de passe';
+                            }
+                            if (value.length < 6) {
+                              return 'Le mot de passe doit contenir au moins 6 caractères';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        _buildPasswordField(
+                          controller: _confirmPasswordController,
+                          hintText: 'Confirmer le mot de passe',
+                          obscureText: _obscureConfirmPassword,
+                          onToggle: () {
+                            setState(() {
+                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Veuillez confirmer votre mot de passe';
+                            }
+                            return null;
+                          },
+                        ),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Checkbox conditions
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _acceptConditions,
+                              onChanged: isLoading
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _acceptConditions = value ?? false;
+                                      });
+                                    },
+                              activeColor: const Color(0xFF5B5BD6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: isLoading
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          _acceptConditions = !_acceptConditions;
+                                        });
+                                      },
+                                child: const Text(
+                                  "J'accepte les conditions",
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 14,
+                                  ),
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // Champs du formulaire
-                  _buildTextField(
-                    controller: _nameController,
-                    hintText: 'Nom complet',
-                    icon: Icons.person_outline,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre nom';
-                      }
-                      return null;
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _buildTextField(
-                    controller: _emailController,
-                    hintText: 'Email',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer votre email';
-                      }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                        return 'Email invalide';
-                      }
-                      return null;
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _buildPasswordField(
-                    controller: _passwordController,
-                    hintText: 'Mot de passe',
-                    obscureText: _obscurePassword,
-                    onToggle: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer un mot de passe';
-                      }
-                      if (value.length < 6) {
-                        return 'Le mot de passe doit contenir au moins 6 caractères';
-                      }
-                      return null;
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  _buildPasswordField(
-                    controller: _confirmPasswordController,
-                    hintText: 'Confirmer le mot de passe',
-                    obscureText: _obscureConfirmPassword,
-                    onToggle: () {
-                      setState(() {
-                        _obscureConfirmPassword = !_obscureConfirmPassword;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez confirmer votre mot de passe';
-                      }
-                      return null;
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Checkbox conditions
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _acceptConditions,
-                        onChanged: isLoading
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _acceptConditions = value ?? false;
-                                });
-                              },
-                        activeColor: const Color(0xFF5B5BD6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: isLoading
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _acceptConditions = !_acceptConditions;
-                                  });
-                                },
-                          child: const Text(
-                            "J'accepte les conditions",
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Bouton S'inscrire
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: (_acceptConditions && !isLoading) ? _register : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF5B5BD6),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              "S'inscrire",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
+                          ],
+                        ),
+                        
+                        const SizedBox(height: 20),
+                        
+                        // Bouton S'inscrire
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: (_acceptConditions && !isLoading) ? _register : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF5B5BD6),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.grey.shade300,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    "S'inscrire",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Déjà un compte ?
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Déjà un compte ?',
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Déjà un compte ? (hors du container)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Déjà un compte ?',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                            },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.only(left: 4),
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Se connecter',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Color(0xFF5B5BD6),
                           fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      TextButton(
-                        onPressed: isLoading
-                            ? null
-                            : () {
-                                Navigator.pop(context);
-                              },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.only(left: 4),
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          'Se connecter',
-                          style: TextStyle(
-                            color: Color(0xFF5B5BD6),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 20),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 20),
+              ],
             ),
           ),
         ),
@@ -531,9 +551,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: TextFormField(
         controller: controller,
@@ -541,10 +561,11 @@ class _RegisterPageState extends State<RegisterPage> {
         validator: validator,
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey.shade500),
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
           prefixIcon: Icon(
             icon,
             color: Colors.grey.shade400,
+            size: 20,
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -565,9 +586,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: TextFormField(
         controller: controller,
@@ -575,10 +596,11 @@ class _RegisterPageState extends State<RegisterPage> {
         validator: validator,
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(color: Colors.grey.shade500),
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
           prefixIcon: Icon(
             Icons.lock_outline,
             color: Colors.grey.shade400,
+            size: 20,
           ),
           suffixIcon: IconButton(
             icon: Icon(
@@ -586,6 +608,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ? Icons.visibility_off_outlined
                   : Icons.visibility_outlined,
               color: Colors.grey.shade400,
+              size: 20,
             ),
             onPressed: onToggle,
           ),

@@ -379,7 +379,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 _buildNavItem(Icons.folder_outlined, 'Projets', 1),
                 const SizedBox(width: 56),
                 _buildNavItem(Icons.people_outline, 'Équipe', 2),
-                _buildNavItem(Icons.person_outline, 'Profil', 3), // ✅ REMPLACÉ Plus par Profil
+                _buildNavItem(Icons.person_outline, 'Profil', 3), 
               ],
             ),
           ),
