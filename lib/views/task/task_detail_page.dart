@@ -29,7 +29,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   @override
   void initState() {
     super.initState();
-    late TaskModel _task;
     _task = widget.task;
     _currentStatus = _task.status;
     if (_task.isCompleted) {
