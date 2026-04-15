@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gestiontaches/models/task.dart';
 
 class TaskDetailPage extends StatefulWidget {
@@ -19,6 +20,10 @@ class TaskDetailPage extends StatefulWidget {
 class _TaskDetailPageState extends State<TaskDetailPage> {
   late String _currentStatus;
   late TaskModel _task;
+  String? _assigneeName;
+  String _assigneeImage = 'https://i.pravatar.cc/150?img=11';
+  final TextEditingController _commentController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final List<Map<String, String>> statusOptions = [
     {'value': 'todo', 'label': 'À faire', 'color': 'grey'},
@@ -34,6 +39,75 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     if (_task.isCompleted) {
       _currentStatus = 'done';
     }
+    _loadAssignee();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  // Charger les infos du collaborateur assigné
+  Future<void> _loadAssignee() async {
+    if (_task.assigneeId != null && _task.assigneeId!.isNotEmpty) {
+      try {
+        final doc = await _firestore.collection('users').doc(_task.assigneeId).get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          setState(() {
+            _assigneeName = data['name'] ?? data['displayName'] ?? 'Collaborateur';
+            _assigneeImage = data['photoURL'] ?? data['avatar'] ?? 'https://i.pravatar.cc/150?img=11';
+          });
+        } else {
+          setState(() {
+            _assigneeName = _task.assigneeId;
+          });
+        }
+      } catch (e) {
+        setState(() {
+          _assigneeName = _task.assigneeId;
+        });
+      }
+    }
+  }
+
+  // Envoyer un commentaire
+  Future<void> _sendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    const currentUserId = 'user123';
+    const currentUserName = 'Moi';
+    const currentUserAvatar = 'https://i.pravatar.cc/150?img=12';
+
+    try {
+      await _firestore
+          .collection('tasks')
+          .doc(_task.id)
+          .collection('comments')
+          .add({
+        'text': text,
+        'authorId': currentUserId,
+        'authorName': currentUserName,
+        'authorAvatar': currentUserAvatar,
+        'createdAt': Timestamp.now(),
+        'mentions': _extractMentions(text),
+      });
+
+      _commentController.clear();
+      FocusScope.of(context).unfocus();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de l\'envoi: $e')),
+      );
+    }
+  }
+
+  // Extraire les mentions @username
+  List<String> _extractMentions(String text) {
+    final matches = RegExp(r'@(\w+)').allMatches(text);
+    return matches.map((m) => m.group(1)!).toList();
   }
 
   String get _statusLabel {
@@ -155,8 +229,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   Widget build(BuildContext context) {
     final priorityColor = _task.priorityColor as Color? ?? Colors.orange;
     final priorityLabel = _task.priority;
-    final assigneeName = _task.assigneeId ?? 'Non assigné';
-    final assigneeImage = _task.assigneeId ?? 'https://i.pravatar.cc/150?img=11';
     final date = _task.dueDate != null ? DateFormat('d MMM').format(_task.dueDate!) : 'Non définie';
     final createdAt = _task.createdAt != null
         ? DateFormat('d MMMM yyyy', 'fr_FR').format(_task.createdAt)
@@ -181,7 +253,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.black54),
             onPressed: () {
-              // TODO: Supprimer la tâche
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -307,9 +378,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               
               const SizedBox(height: 24),
               
-              // Info Cards
+              // Info Cards - CORRIGÉ pour matcher l'image exacte
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -323,109 +394,163 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 ),
                 child: Column(
                   children: [
-                    // Assigned to
-                    _buildInfoRow(
-                      icon: Icons.person_outline,
-                      label: 'Assigné à',
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundImage: NetworkImage(assigneeImage),
+                    // Assigned to - LAYOUT CORRIGÉ
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline, size: 20, color: Colors.grey[400]),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Assigné à',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            assigneeName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                        ),
+                        const Spacer(),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundImage: NetworkImage(_assigneeImage),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Modifier',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.indigo[400],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const Divider(height: 24),
-                    
-                    // Due date
-                    _buildInfoRow(
-                      icon: Icons.calendar_today_outlined,
-                      label: 'Échéance',
-                      child: Row(
-                        children: [
-                          Text(
-                            date,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (_currentStatus != 'done')
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
+                            const SizedBox(width: 8),
+                            Text(
+                              _assigneeName ?? 'Chargement...',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.red[50],
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                // TODO: Ouvrir sélecteur de membre
+                              },
                               child: Text(
-                                'En retard',
+                                'Modifier',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.red[400],
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: Colors.indigo[400],
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ),
                     
                     const Divider(height: 24),
                     
-                    // Priority dynamique
-                    _buildInfoRow(
-                      icon: Icons.flag_outlined,
-                      label: 'Priorité',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: priorityColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          priorityLabel,
+                    // Due date - LAYOUT CORRIGÉ
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today_outlined, size: 20, color: Colors.grey[400]),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Échéance',
                           style: TextStyle(
-                            fontSize: 12,
-                            color: priorityColor,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Colors.grey[500],
                           ),
                         ),
-                      ),
+                        const Spacer(),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              date,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (_currentStatus != 'done') ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'En retard',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.red[400],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                     
                     const Divider(height: 24),
                     
-                    // Created date
-                    _buildInfoRow(
-                      icon: Icons.access_time,
-                      label: 'Créée le',
-                      value: createdAt,
+                    // Priority - LAYOUT CORRIGÉ
+                    Row(
+                      children: [
+                        Icon(Icons.flag_outlined, size: 20, color: Colors.grey[400]),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Priorité',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: priorityColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            priorityLabel,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: priorityColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const Divider(height: 24),
+                    
+                    // Created date - LAYOUT CORRIGÉ
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, size: 20, color: Colors.grey[400]),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Créée le',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          createdAt,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -433,49 +558,66 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               
               const SizedBox(height: 28),
               
-              // Comments Section
-              Text(
-                'Commentaires (3)',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
+              // Comments Section - DYNAMIQUE
+              StreamBuilder<QuerySnapshot>(
+                stream: _firestore
+                    .collection('tasks')
+                    .doc(_task.id)
+                    .collection('comments')
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Text('Erreur: ${snapshot.error}');
+                  }
+
+                  final comments = snapshot.data?.docs ?? [];
+                  final commentCount = comments.length;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Commentaires ($commentCount)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (comments.isEmpty)
+                        Text(
+                          'Aucun commentaire. Soyez le premier !',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        )
+                      else
+                        ...comments.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final createdAt = data['createdAt'] as Timestamp?;
+                          final timeAgo = createdAt != null
+                              ? _formatTimeAgo(createdAt.toDate())
+                              : 'maintenant';
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildComment(
+                              name: data['authorName'] ?? 'Anonyme',
+                              time: timeAgo,
+                              avatarUrl: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=5',
+                              comment: data['text'] ?? '',
+                              highlightName: true,
+                            ),
+                          );
+                        }).toList(),
+                      const SizedBox(height: 100),
+                    ],
+                  );
+                },
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Comment 1
-              _buildComment(
-                name: 'Alice Martin',
-                time: '2h',
-                avatarUrl: 'https://i.pravatar.cc/150?img=5',
-                comment: 'J\'ai terminé la première version, @Bob peux-tu relire ?',
-                highlightName: true,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Comment 2
-              _buildComment(
-                name: 'Bob Durand',
-                time: '1h',
-                avatarUrl: 'https://i.pravatar.cc/150?img=11',
-                comment: 'Super travail ! Quelques ajustements à faire sur @Claire ta partie',
-                highlightName: true,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Comment 3
-              _buildComment(
-                name: 'Claire Petit',
-                time: '30min',
-                avatarUrl: 'https://i.pravatar.cc/150?img=9',
-                comment: 'Ok je regarde ça maintenant',
-              ),
-              
-              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -515,6 +657,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     children: [
                       Expanded(
                         child: TextField(
+                          controller: _commentController,
                           decoration: InputDecoration(
                             hintText: 'Ajouter un commentaire...',
                             hintStyle: TextStyle(
@@ -542,17 +685,20 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.indigo[600],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.send,
-                  color: Colors.white,
-                  size: 20,
+              GestureDetector(
+                onTap: _sendComment,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.indigo[600],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.send,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -562,38 +708,16 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    String? value,
-    Widget? child,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey[400]),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 3,
-          child: child ?? Text(
-            value ?? '',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    );
+  // Formater le temps écoulé
+  String _formatTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 1) return 'maintenant';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}min';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}j';
+    return DateFormat('d MMM').format(date);
   }
 
   Widget _buildComment({

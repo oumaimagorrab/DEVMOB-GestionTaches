@@ -60,12 +60,7 @@ final stats = taskProvider.stats;
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-            onPressed: () {},
-          ),
-        ],
+        
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
