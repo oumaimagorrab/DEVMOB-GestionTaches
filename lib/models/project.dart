@@ -6,6 +6,7 @@ class ProjectModel {
   final String? description;
   final String createdBy;
   final DateTime createdAt;
+  final double? progress;
   final List<String> members;
   final String? color;
   final String status;  // ✅ Ajout du champ status
@@ -16,6 +17,7 @@ class ProjectModel {
     this.description,
     required this.createdBy,
     required this.createdAt,
+    this.progress = 0.0,
     this.members = const [],
     this.color,
     this.status = 'active',  // ✅ Valeur par défaut
@@ -28,6 +30,7 @@ class ProjectModel {
       description: json['description'],
       createdBy: json['createdBy'] ?? '',
       createdAt: _parseDate(json['createdAt']),
+      progress: json['progress'] != null ? (json['progress'] as num).toDouble() : 0.0,
       members: List<String>.from(json['members'] ?? []),
       color: json['color'],
       status: json['status'] ?? 'active',  // ✅ Lecture du status
@@ -49,6 +52,7 @@ class ProjectModel {
       'description': description,
       'createdBy': createdBy,
       'createdAt': Timestamp.fromDate(createdAt),
+      'progress': progress,
       'members': members,
       'color': color,
       'status': status,  // ✅ Sauvegarde du status
@@ -61,6 +65,7 @@ class ProjectModel {
     String? description,
     String? createdBy,
     DateTime? createdAt,
+    double? progress,
     List<String>? members,
     String? color,
     String? status,  // ✅ Ajout dans copyWith
@@ -71,6 +76,7 @@ class ProjectModel {
       description: description ?? this.description,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
+      progress: progress ?? this.progress,
       members: members ?? this.members,
       color: color ?? this.color,
       status: status ?? this.status,  // ✅ Utilisation du status

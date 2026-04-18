@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/project.dart';
+import 'package:gestiontaches/views/profile/user_profile_page.dart';
 
 class CollaboratorProjectsPage extends StatefulWidget {
   const CollaboratorProjectsPage({super.key});
@@ -11,49 +12,167 @@ class CollaboratorProjectsPage extends StatefulWidget {
   State<CollaboratorProjectsPage> createState() => _CollaboratorProjectsPageState();
 }
 
-class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
+class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage>
+    with SingleTickerProviderStateMixin {  // ← AJOUTÉ : pour l'animation
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  int _currentIndex = 0;
+
+  // ← AJOUTÉ : Contrôleur d'animation pour le logo
+  late AnimationController _logoController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // ← AJOUTÉ : Initialisation de l'animation
+    _logoController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    // ← AJOUTÉ : Nettoyage du contrôleur
+    _logoController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final userId = context.read<AppAuthProvider>().user?.id;
-    final userName = context.read<AppAuthProvider>().user?.name ?? 'Collaborateur';
+
+    if (userId == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Utilisateur non authentifié'),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Mes Projets',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'Bonjour $userName',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Color(0xFF5B5BD6)),
-            onPressed: () async {
-              await context.read<AppAuthProvider>().signOut();
-              if (mounted) {
-                Navigator.pushReplacementNamed(context, '/login');
-              }
+        // ← MODIFIÉ : Logo animé remplaçant le container simple
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, child) {
+              return Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF5B5BD6).withOpacity(
+                        0.2 + (_pulseAnimation.value * 0.1),
+                      ),
+                      blurRadius: 10 + (_pulseAnimation.value * 5),
+                      spreadRadius: 1 + (_pulseAnimation.value * 2),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF5B5BD6).withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.folder_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -2,
+                      right: -2,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Colors.amber, Colors.orange],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.amber.withOpacity(0.4),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.bolt,
+                          color: Colors.white,
+                          size: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
             },
+          ),
+        ),
+        title: const Text(
+          'Mes Projets',
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
+                onPressed: () {
+                  // Navigation vers les notifications
+                },
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -126,12 +245,53 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
           );
         },
       ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          // Navigation vers les autres pages selon l'index
+          if (index == 1) {
+            Navigator.pushNamed(context, '/team');
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
+          }
+        },
+        backgroundColor: Colors.white,
+        elevation: 8,
+        selectedItemColor: const Color(0xFF5B5BD6),
+        unselectedItemColor: Colors.grey.shade400,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.folder_outlined),
+            label: 'Projets',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people_outline),
+            label: 'Equipe',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profil',
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildProjectCard(ProjectModel project) {
+    // Couleur de la barre de progression selon le statut
+    final Color progressColor = _getProgressColor(project.status);
+    // Pourcentage de progression (à adapter selon votre modèle)
+    final double progress = project.progress ?? 0.0;
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -140,43 +300,35 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          // Naviguer vers le détail du projet
           Navigator.pushNamed(
             context,
             '/collaborator/project/detail',
             arguments: project,
           );
         },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: Column(
+          children: [
+            // Bordure colorée en haut
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: progressColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.folder_outlined,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  // Titre et menu
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
                           project.title,
                           style: const TextStyle(
                             fontSize: 18,
@@ -184,105 +336,140 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                             color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          project.description ?? 'Aucune description',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
+                      ),
+                      Icon(
+                        Icons.more_vert,
+                        color: Colors.grey.shade400,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Description
+                  Text(
+                    project.description ?? 'Aucune description',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      height: 1.4,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  // Avatars et date
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Avatars des membres (stackés)
+                      _buildMemberAvatars(project.members),
+                      // Date
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 14,
+                            color: Colors.grey.shade500,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDate(project.createdAt),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Barre de progression
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress / 100,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                      minHeight: 6,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Pourcentage
+                  Text(
+                    '${progress.toInt()}% complété',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildStatusChip(project.status),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today_outlined,
-                        size: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(project.createdAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusChip(String status) {
-    Color color;
-    String label;
-    IconData icon;
-
+  Color _getProgressColor(String status) {
     switch (status) {
       case 'en_cours':
-        color = Colors.blue;
-        label = 'En cours';
-        icon = Icons.play_circle_outline;
-        break;
+        return const Color(0xFF5B5BD6); // Violet
       case 'termine':
-        color = Colors.green;
-        label = 'Terminé';
-        icon = Icons.check_circle_outline;
-        break;
+        return Colors.green;
       case 'en_attente':
-        color = Colors.orange;
-        label = 'En attente';
-        icon = Icons.schedule_outlined;
-        break;
+        return Colors.orange;
       default:
-        color = Colors.grey;
-        label = status;
-        icon = Icons.help_outline;
+        return Colors.grey;
+    }
+  }
+
+  Widget _buildMemberAvatars(List<String>? members) {
+    if (members == null || members.isEmpty) {
+      return const SizedBox.shrink();
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
+    // Limite à 3 avatars + compteur
+    final displayMembers = members.take(3).toList();
+    const double avatarSize = 32;
+    const double overlap = 12;
+
+    return SizedBox(
+      height: avatarSize,
+      width: avatarSize + (displayMembers.length - 1) * overlap,
+      child: Stack(
+        children: displayMembers.asMap().entries.map((entry) {
+          final index = entry.key;
+          final memberId = entry.value;
+          return Positioned(
+            left: index * overlap,
+            child: Container(
+              width: avatarSize,
+              height: avatarSize,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                image: const DecorationImage(
+                  // TODO: Charger l'image du membre depuis Firestore
+                  image: NetworkImage('https://i.pravatar.cc/150?img=${1}'),
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final months = [
+      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+    ];
+    return '${date.day} ${months[date.month - 1]}';
   }
 }
