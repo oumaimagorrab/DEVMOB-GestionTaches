@@ -14,7 +14,7 @@ class UserModel {
     this.photoURL,
     required this.createdAt,
     this.isActive = true,
-    this.role = 'user',
+    this.role = 'collaborateur',
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -26,7 +26,7 @@ class UserModel {
       photoURL: json['photoURL'],
       createdAt: json['createdAt']?.toDate() ?? DateTime.now(),
       isActive: json['isActive'] ?? true,
-      role: json['role'] ?? 'user',
+      role: json['role'] ?? 'collaborateur',
     );
   }
 
@@ -63,5 +63,5 @@ class UserModel {
   }
 
   bool get isAdmin => role == 'admin';
-  bool get isRegularUser => role == 'user';
+  bool get isRegularUser => role == 'collaborateur';
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'register_page.dart';
 import 'package:gestiontaches/views/project/dashboard_page.dart';
-import 'package:gestiontaches/views/project/userDashboard.dart';
+import 'package:gestiontaches/views/project/collaborator_projects_page.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 
@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()),
+          MaterialPageRoute(builder: (context) => const CollaboratorProjectsPage()),
           (route) => false,
         );
       }
@@ -83,13 +83,26 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _signInWithGoogle() async {
+    Future<void> _signInWithGoogle() async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
 
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      // ✅ CORRIGÉ : Redirection selon le rôle comme pour l'email
+      if (authProvider.isAdmin) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+          (route) => false,
+        );
+      } else {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const CollaboratorProjectsPage()),
+          (route) => false,
+        );
+      }
     } else {
       _showError(authProvider.error ?? 'Erreur Google');
     }

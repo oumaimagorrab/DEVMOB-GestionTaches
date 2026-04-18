@@ -22,6 +22,12 @@ class AppAuthProvider extends ChangeNotifier {
   bool get isAdmin => _user?.isAdmin ?? false;
   bool get isCollaborator => _user?.isRegularUser ?? false; // ou isUser
 
+  String getInitialRoute() {
+  if (isAdmin) return '/admin/dashboard';
+  if (isCollaborator) return '/collaborator/projects';
+  return '/login'; // Fallback
+  } 
+
   // Stream d'authentification
   Stream<User?> get authStateChanges => _authService.authStateChanges;
 
