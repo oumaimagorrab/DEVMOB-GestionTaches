@@ -8,6 +8,7 @@ class ProjectModel {
   final DateTime createdAt;
   final List<String> members;
   final String? color;
+  final String status;  // ✅ Ajout du champ status
 
   ProjectModel({
     required this.id,
@@ -17,6 +18,7 @@ class ProjectModel {
     required this.createdAt,
     this.members = const [],
     this.color,
+    this.status = 'active',  // ✅ Valeur par défaut
   });
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +30,7 @@ class ProjectModel {
       createdAt: _parseDate(json['createdAt']),
       members: List<String>.from(json['members'] ?? []),
       color: json['color'],
+      status: json['status'] ?? 'active',  // ✅ Lecture du status
     );
   }
 
@@ -48,6 +51,7 @@ class ProjectModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'members': members,
       'color': color,
+      'status': status,  // ✅ Sauvegarde du status
     };
   }
 
@@ -59,6 +63,7 @@ class ProjectModel {
     DateTime? createdAt,
     List<String>? members,
     String? color,
+    String? status,  // ✅ Ajout dans copyWith
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -68,6 +73,7 @@ class ProjectModel {
       createdAt: createdAt ?? this.createdAt,
       members: members ?? this.members,
       color: color ?? this.color,
+      status: status ?? this.status,  // ✅ Utilisation du status
     );
   }
 }

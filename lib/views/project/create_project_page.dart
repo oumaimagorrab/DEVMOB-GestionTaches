@@ -5,7 +5,7 @@ import 'package:gestiontaches/providers/project_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:async'; // ✅ AJOUTÉ pour StreamSubscription
+import 'dart:async';
 
 class CreateProjectPage extends StatefulWidget {
   const CreateProjectPage({super.key});
@@ -18,7 +18,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  
+
   DateTime? _selectedDate;
   int _selectedColorIndex = 0;
   int _descriptionLength = 0;
@@ -36,13 +36,8 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
 
   List<Map<String, dynamic>> _members = [];
   String? _selectedMemberId;
-
-  // Membres invités au projet
   List<Map<String, dynamic>> invitedMembers = [];
-
-  // ✅ AJOUTÉ: Subscription pour écouter les changements d'authentification
   StreamSubscription<User?>? _authSubscription;
-  // Subscription pour écouter les changements de la collection users
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
 
   @override
@@ -53,14 +48,12 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         _descriptionLength = _descriptionController.text.length;
       });
     });
-    
-    // ✅ CORRECTION: Utiliser un listener d'authentification
     _setupAuthListener();
   }
 
   @override
   void dispose() {
-    _authSubscription?.cancel(); // ✅ IMPORTANT: Annuler le listener
+    _authSubscription?.cancel();
     _usersSubscription?.cancel();
     _nameController.dispose();
     _descriptionController.dispose();
@@ -68,9 +61,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     super.dispose();
   }
 
-  // ✅ NOUVELLE MÉTHODE: Écouter les changements d'authentification
   void _setupAuthListener() {
-    // Vérifier immédiatement si l'utilisateur est déjà connecté
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser != null) {
       print('✅ Utilisateur déjà connecté: ${currentUser.uid}');
@@ -80,15 +71,12 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       setState(() => _isLoadingMembers = true);
     }
 
-    // Écouter les changements d'état d'authentification
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null && mounted) {
         print('✅ Utilisateur authentifié: ${user.uid}');
-        // Utiliser un stream pour garder la liste à jour en temps réel
         _subscribeMembersStream();
       } else if (user == null && mounted) {
         print('⚠️ Utilisateur déconnecté');
-        // Annuler l'abonnement à la collection users et vider la liste
         _usersSubscription?.cancel();
         setState(() {
           _isLoadingMembers = false;
@@ -98,14 +86,10 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     });
   }
 
-  // ✅ MÉTHODE CORRIGÉE: Charger les membres avec vérification d'authentification
   Future<void> _loadMembers() async {
-    // Pour la compatibilité, on (ré)utilise l'abonnement stream qui garde
-    // la liste à jour en continu. On déclenche simplement l'abonnement.
     _subscribeMembersStream();
   }
 
-  // Abonnement en temps réel à la collection `users` pour garder la liste dynamique
   void _subscribeMembersStream() {
     _usersSubscription?.cancel();
     setState(() => _isLoadingMembers = true);
@@ -154,18 +138,15 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     });
   }
 
-  // ✅ MÉTHODE CORRIGÉE: Rechercher un utilisateur par email
   Future<Map<String, dynamic>?> _findUserByEmail(String email) async {
     try {
-      // Chercher dans la liste déjà chargée
       final existingUser = _members.cast<Map<String, dynamic>?>().firstWhere(
         (m) => m != null && (m['email'] as String).toLowerCase() == email.toLowerCase(),
         orElse: () => null,
       );
-      
+
       if (existingUser != null) return existingUser;
 
-      // Requête Firestore
       final QuerySnapshot result = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: email.toLowerCase())
@@ -175,12 +156,12 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       if (result.docs.isNotEmpty) {
         final doc = result.docs.first;
         final data = doc.data() as Map<String, dynamic>;
-        
+
         final role = data['role'] ?? 'collaborateur';
         if (role == 'admin') {
           return null;
         }
-        
+
         return {
           'id': doc.id,
           'name': data['displayName'] ?? data['name'] ?? email.split('@')[0],
@@ -213,7 +194,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         );
       },
     );
-    
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -227,7 +208,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
 
   Future<void> _inviteMember() async {
     final email = _emailController.text.trim().toLowerCase();
-    
+
     if (email.isEmpty) {
       _showSnackBar('Veuillez entrer un email');
       return;
@@ -292,6 +273,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     );
   }
 
+  // ✅ MODIFIÉ: Ajout du paramètre status
   Future<void> _createProject() async {
     if (_nameController.text.trim().isEmpty) {
       _showSnackBar('Veuillez entrer un nom de projet');
@@ -305,11 +287,12 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     }
 
     final provider = Provider.of<ProjectProvider>(context, listen: false);
-    
+
     final List<String> memberIds = invitedMembers
         .map((m) => m['id'] as String)
         .toList();
 
+    // ✅ AJOUTÉ: Paramètre status='active'
     final project = await provider.createProject(
       title: _nameController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
@@ -318,6 +301,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       createdBy: currentUserId,
       members: memberIds,
       color: projectColors[_selectedColorIndex].value.toRadixString(16),
+      status: 'active',  // ✅ AJOUTÉ: Le nouveau projet est actif par défaut
     );
 
     if (project != null) {
@@ -332,7 +316,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd/MM/yyyy', 'fr_FR');
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -389,9 +373,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       color: Colors.black87,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   TextField(
                     controller: _nameController,
                     onChanged: (_) => setState(() {}),
@@ -418,9 +402,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   TextField(
                     controller: _descriptionController,
                     maxLines: 4,
@@ -448,7 +432,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       contentPadding: const EdgeInsets.all(16),
                     ),
                   ),
-                  
+
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
@@ -459,9 +443,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   GestureDetector(
                     onTap: _selectDate,
                     child: Container(
@@ -493,9 +477,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   const Text(
                     'Couleur du projet',
                     style: TextStyle(
@@ -504,9 +488,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       color: Colors.black87,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 12),
-                  
+
                   Row(
                     children: List.generate(projectColors.length, (index) {
                       final isSelected = _selectedColorIndex == index;
@@ -546,9 +530,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       );
                     }),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   const Text(
                     'Membres',
                     style: TextStyle(
@@ -557,9 +541,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       color: Colors.black87,
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   if (invitedMembers.isNotEmpty) ...[
                     SizedBox(
                       height: 80,
@@ -647,7 +631,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  
+
                   Row(
                     children: [
                       Expanded(
@@ -712,9 +696,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   if (_members.isNotEmpty) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -737,9 +721,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,

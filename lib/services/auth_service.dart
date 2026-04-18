@@ -1,17 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../models/user.dart';  // Contient UserModel
+import '../models/user.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // Stream de l'utilisateur courant (pour le provider)
   Stream<User?> get authStateChanges => _auth.authStateChanges();
-
-  // Récupérer l'utilisateur courant
   User? get currentUser => _auth.currentUser;
 
   // Connexion Email/Mot de passe
@@ -21,9 +18,8 @@ class AuthService {
         email: email.trim(),
         password: password,
       );
-      
+
       if (result.user != null) {
-        // Récupérer les données Firestore
         final userModel = await _getUserFromFirestore(result.user!.uid);
         return userModel ?? _userToUserModel(result.user!);
       }
@@ -33,7 +29,7 @@ class AuthService {
     }
   }
 
-  // Inscription Email/Mot de passe
+  // ✅ CORRIGÉ: Inscription avec role='collaborateur'
   Future<UserModel?> signUpWithEmail({
     required String name,
     required String email,
@@ -41,7 +37,6 @@ class AuthService {
     String? imageUrl,
   }) async {
     try {
-      // 1. Créer l'utilisateur Firebase
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
@@ -49,10 +44,9 @@ class AuthService {
 
       if (result.user == null) throw Exception('Échec création utilisateur');
 
-      // 2. Mettre à jour le profil
       await result.user!.updateDisplayName(name.trim());
 
-      // 3. Créer le UserModel
+      // ✅ CORRIGÉ: role='collaborateur' au lieu de 'user'
       final userModel = UserModel(
         id: result.user!.uid,
         name: name.trim(),
@@ -60,18 +54,18 @@ class AuthService {
         photoURL: imageUrl,
         createdAt: DateTime.now(),
         isActive: true,
-        role: 'user',  // Rôle par défaut
+        role: 'collaborateur',  // ✅ CHANGÉ de 'user' à 'collaborateur'
       );
 
-      // 4. Sauvegarder dans Firestore avec serverTimestamp
       await _firestore.collection('users').doc(result.user!.uid).set({
         'id': result.user!.uid,
         'name': name.trim(),
         'email': email.trim(),
         'photoURL': imageUrl,
-        'createdAt': FieldValue.serverTimestamp(),  // Timestamp Firestore
+        'createdAt': FieldValue.serverTimestamp(),
         'isActive': true,
-        'role': 'user',  // Rôle par défaut
+        'role': 'collaborateur',  // ✅ CHANGÉ de 'user' à 'collaborateur'
+        'isAdmin': false,         // ✅ AJOUTÉ
       });
 
       return userModel;
@@ -80,27 +74,23 @@ class AuthService {
     }
   }
 
-  // Connexion Google
+  // ✅ CORRIGÉ: Connexion Google avec role='collaborateur'
   Future<UserModel?> signInWithGoogle() async {
     try {
-      // Déclencher le flux Google
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null; // Annulé par l'utilisateur
+      if (googleUser == null) return null;
 
-      // Obtenir les credentials
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Connexion Firebase
       final UserCredential result = await _auth.signInWithCredential(credential);
-      
+
       if (result.user != null) {
-        // Vérifier si nouvel utilisateur
         if (result.additionalUserInfo?.isNewUser ?? false) {
-          // Créer le profil dans Firestore
+          // ✅ CORRIGÉ: role='collaborateur'
           final userModel = UserModel(
             id: result.user!.uid,
             name: result.user!.displayName ?? googleUser.displayName ?? '',
@@ -108,9 +98,9 @@ class AuthService {
             photoURL: result.user!.photoURL,
             createdAt: DateTime.now(),
             isActive: true,
-            role: 'user',  // Rôle par défaut
+            role: 'collaborateur',  // ✅ CHANGÉ
           );
-          
+
           await _firestore.collection('users').doc(result.user!.uid).set({
             'id': result.user!.uid,
             'name': userModel.name,
@@ -118,12 +108,12 @@ class AuthService {
             'photoURL': userModel.photoURL,
             'createdAt': FieldValue.serverTimestamp(),
             'isActive': true,
-            'role': 'user',  // Rôle par défaut
+            'role': 'collaborateur',  // ✅ CHANGÉ
+            'isAdmin': false,         // ✅ AJOUTÉ
           });
-          
+
           return userModel;
         } else {
-          // Utilisateur existant
           final userModel = await _getUserFromFirestore(result.user!.uid);
           return userModel ?? _userToUserModel(result.user!);
         }
@@ -134,7 +124,6 @@ class AuthService {
     }
   }
 
-  // Déconnexion
   Future<void> signOut() async {
     await Future.wait([
       _auth.signOut(),
@@ -142,7 +131,6 @@ class AuthService {
     ]);
   }
 
-  // Réinitialisation mot de passe
   Future<void> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
@@ -151,14 +139,13 @@ class AuthService {
     }
   }
 
-  // Récupérer UserModel depuis Firestore
+  // ✅ CORRIGÉ: Récupération avec role par défaut 'collaborateur'
   Future<UserModel?> _getUserFromFirestore(String uid) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-        
-        // Gérer le timestamp Firestore
+
         DateTime createdAt;
         if (data['createdAt'] is Timestamp) {
           createdAt = (data['createdAt'] as Timestamp).toDate();
@@ -167,7 +154,7 @@ class AuthService {
         } else {
           createdAt = DateTime.now();
         }
-        
+
         return UserModel(
           id: data['id'] ?? data['uid'] ?? uid,
           name: data['name'] ?? data['nomComplet'] ?? '',
@@ -175,7 +162,7 @@ class AuthService {
           photoURL: data['photoURL'] ?? data['avatar'],
           createdAt: createdAt,
           isActive: data['isActive'] ?? true,
-          role: data['role'] ?? 'user',  // Valeur par défaut si non définie
+          role: data['role'] ?? 'collaborateur',  // ✅ CHANGÉ
         );
       }
       return null;
@@ -184,66 +171,62 @@ class AuthService {
       return null;
     }
   }
-  // Dans class AuthService, ajoutez :
 
-// ✅ NOUVEAU : Récupérer un utilisateur par ID (rendre publique la méthode existante)
-Future<UserModel?> getUserFromFirestore(String uid) async {
-  return _getUserFromFirestore(uid); // Appelle votre méthode privée existante
-}
-
-// ✅ NOUVEAU : Mettre à jour le rôle d'un utilisateur
-Future<void> updateUserRole(String uid, String newRole) async {
-  try {
-    await _firestore.collection('users').doc(uid).update({
-      'role': newRole,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  } catch (e) {
-    throw Exception('Erreur mise à jour rôle: $e');
+  Future<UserModel?> getUserFromFirestore(String uid) async {
+    return _getUserFromFirestore(uid);
   }
-}
 
-// ✅ NOUVEAU : Créer un utilisateur admin (pour setup initial)
-Future<UserModel?> createAdminUser({
-  required String name,
-  required String email,
-  required String password,
-}) async {
-  try {
-    final UserCredential result = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-
-    if (result.user == null) throw Exception('Échec création utilisateur');
-
-    await result.user!.updateDisplayName(name.trim());
-
-    final userModel = UserModel(
-      id: result.user!.uid,
-      name: name.trim(),
-      email: email.trim(),
-      createdAt: DateTime.now(),
-      isActive: true,
-      role: 'admin', // ✅ Rôle admin
-    );
-
-    await _firestore.collection('users').doc(result.user!.uid).set({
-      'id': result.user!.uid,
-      'name': name.trim(),
-      'email': email.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'isActive': true,
-      'role': 'admin', // ✅ Rôle admin
-    });
-
-    return userModel;
-  } on FirebaseAuthException catch (e) {
-    throw _handleAuthException(e);
+  Future<void> updateUserRole(String uid, String newRole) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'role': newRole,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Erreur mise à jour rôle: $e');
+    }
   }
-}
 
-  // Convertir Firebase User en UserModel
+  Future<UserModel?> createAdminUser({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final UserCredential result = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      if (result.user == null) throw Exception('Échec création utilisateur');
+
+      await result.user!.updateDisplayName(name.trim());
+
+      final userModel = UserModel(
+        id: result.user!.uid,
+        name: name.trim(),
+        email: email.trim(),
+        createdAt: DateTime.now(),
+        isActive: true,
+        role: 'admin',
+      );
+
+      await _firestore.collection('users').doc(result.user!.uid).set({
+        'id': result.user!.uid,
+        'name': name.trim(),
+        'email': email.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'isActive': true,
+        'role': 'admin',
+        'isAdmin': true,
+      });
+
+      return userModel;
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   UserModel _userToUserModel(User user) {
     return UserModel(
       id: user.uid,
@@ -252,11 +235,10 @@ Future<UserModel?> createAdminUser({
       photoURL: user.photoURL,
       createdAt: DateTime.now(),
       isActive: true,
-      role: 'user',  // Rôle par défaut
+      role: 'collaborateur',  // ✅ CHANGÉ
     );
   }
 
-  // Gestion centralisée des erreurs
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':

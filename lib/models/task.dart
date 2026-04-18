@@ -12,6 +12,7 @@ class TaskModel {
   final String? assigneeId;
   final DateTime createdAt;
   final DateTime? dueDate;
+  final DateTime? completedAt;  // ✅ AJOUTÉ: date de complétion
   final bool isCompleted;
   final List<String> comments;
 
@@ -26,6 +27,7 @@ class TaskModel {
     this.assigneeId,
     required this.createdAt,
     this.dueDate,
+    this.completedAt,  // ✅ AJOUTÉ
     this.isCompleted = false,
     this.comments = const [],
   });
@@ -42,6 +44,7 @@ class TaskModel {
       assigneeId: json['assigneeId'],
       createdAt: _parseDate(json['createdAt']),
       dueDate: json['dueDate'] != null ? _parseDate(json['dueDate']) : null,
+      completedAt: json['completedAt'] != null ? _parseDate(json['completedAt']) : null,  // ✅ AJOUTÉ
       isCompleted: json['isCompleted'] ?? false,
       comments: List<String>.from(json['comments'] ?? []),
     );
@@ -67,6 +70,7 @@ class TaskModel {
       'assigneeId': assigneeId,
       'createdAt': Timestamp.fromDate(createdAt),
       'dueDate': dueDate != null ? Timestamp.fromDate(dueDate!) : null,
+      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,  // ✅ AJOUTÉ
       'isCompleted': isCompleted,
       'comments': comments,
     };
@@ -83,6 +87,7 @@ class TaskModel {
     String? assigneeId,
     DateTime? createdAt,
     DateTime? dueDate,
+    DateTime? completedAt,  // ✅ AJOUTÉ
     bool? isCompleted,
     List<String>? comments,
   }) {
@@ -97,6 +102,7 @@ class TaskModel {
       assigneeId: assigneeId ?? this.assigneeId,
       createdAt: createdAt ?? this.createdAt,
       dueDate: dueDate ?? this.dueDate,
+      completedAt: completedAt ?? this.completedAt,  // ✅ AJOUTÉ
       isCompleted: isCompleted ?? this.isCompleted,
       comments: comments ?? this.comments,
     );

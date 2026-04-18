@@ -10,17 +10,18 @@ class ProjectService {
   factory ProjectService() => _instance;
   ProjectService._internal();
 
-  // Créer un nouveau projet
+  // ✅ CRÉER un projet avec status
   Future<ProjectModel> createProject({
     required String title,
     String? description,
     required String createdBy,
     List<String> members = const [],
     String? color,
+    String status = 'active',  // ✅ AJOUTÉ: status par défaut
   }) async {
     try {
       final docRef = _firestore.collection(_collection).doc();
-      
+
       final project = ProjectModel(
         id: docRef.id,
         title: title,
@@ -29,16 +30,17 @@ class ProjectService {
         createdAt: DateTime.now(),
         members: members,
         color: color,
+        status: status,  // ✅ AJOUTÉ
       );
 
       await docRef.set(project.toJson());
       return project;
     } catch (e) {
-      throw Exception('Erreur lors de la création du projet: $e');
+      throw Exception('Erreur lors de la création du projet: \$e');
     }
   }
 
-  // Récupérer tous les projets
+  // ✅ Récupérer tous les projets (sans filtre status)
   Stream<List<ProjectModel>> getProjects() {
     return _firestore
         .collection(_collection)
@@ -51,7 +53,21 @@ class ProjectService {
     });
   }
 
-  // Récupérer les projets créés ou auxquels l'utilisateur appartient
+  // ✅ Récupérer seulement les projets actifs (avec filtre status)
+  Stream<List<ProjectModel>> getActiveProjects() {
+    return _firestore
+        .collection(_collection)
+        .where('status', isEqualTo: 'active')  // ✅ FILTRE STATUS
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ProjectModel.fromJson({...doc.data(), 'id': doc.id}))
+          .toList();
+    });
+  }
+
+  // Récupérer les projets créés par l'utilisateur
   Stream<List<ProjectModel>> getUserProjects(String userId) {
     return _firestore
         .collection(_collection)
@@ -89,32 +105,55 @@ class ProjectService {
       }
       return null;
     } catch (e) {
-      throw Exception('Erreur lors de la récupération du projet: $e');
+      throw Exception('Erreur lors de la récupération du projet: \$e');
     }
   }
 
-  // Mettre à jour un projet
+  // ✅ METTRE À JOUR un projet (avec status optionnel)
   Future<void> updateProject(
     String projectId, {
     String? title,
     String? description,
     List<String>? members,
     String? color,
+    String? status,  // ✅ AJOUTÉ: optionnel
   }) async {
     try {
       final updates = <String, dynamic>{};
-      
+
       if (title != null) updates['title'] = title;
       if (description != null) updates['description'] = description;
       if (members != null) updates['members'] = members;
       if (color != null) updates['color'] = color;
+      if (status != null) updates['status'] = status;  // ✅ AJOUTÉ
 
       if (updates.isNotEmpty) {
         await _firestore.collection(_collection).doc(projectId).update(updates);
       }
     } catch (e) {
-      throw Exception('Erreur lors de la mise à jour du projet: $e');
+      throw Exception('Erreur lors de la mise à jour du projet: \$e');
     }
+  }
+
+  // ✅ NOUVELLE MÉTHODE: Changer le status d'un projet
+  Future<void> updateProjectStatus(String projectId, String status) async {
+    try {
+      await _firestore.collection(_collection).doc(projectId).update({
+        'status': status,  // 'active', 'completed', 'archived'
+      });
+    } catch (e) {
+      throw Exception('Erreur lors du changement de status: \$e');
+    }
+  }
+
+  // ✅ NOUVELLE MÉTHODE: Archiver un projet
+  Future<void> archiveProject(String projectId) async {
+    return updateProjectStatus(projectId, 'archived');
+  }
+
+  // ✅ NOUVELLE MÉTHODE: Marquer comme terminé
+  Future<void> completeProject(String projectId) async {
+    return updateProjectStatus(projectId, 'completed');
   }
 
   // Ajouter un membre au projet
@@ -124,7 +163,7 @@ class ProjectService {
         'members': FieldValue.arrayUnion([userId]),
       });
     } catch (e) {
-      throw Exception('Erreur lors de l\'ajout du membre: $e');
+      throw Exception('Erreur lors de l\'ajout du membre: \$e');
     }
   }
 
@@ -135,7 +174,7 @@ class ProjectService {
         'members': FieldValue.arrayRemove([userId]),
       });
     } catch (e) {
-      throw Exception('Erreur lors du retrait du membre: $e');
+      throw Exception('Erreur lors du retrait du membre: \$e');
     }
   }
 
@@ -144,7 +183,7 @@ class ProjectService {
     try {
       await _firestore.collection(_collection).doc(projectId).delete();
     } catch (e) {
-      throw Exception('Erreur lors de la suppression du projet: $e');
+      throw Exception('Erreur lors de la suppression du projet: \$e');
     }
   }
 
@@ -154,14 +193,14 @@ class ProjectService {
       final snapshot = await _firestore
           .collection(_collection)
           .where('title', isGreaterThanOrEqualTo: query)
-          .where('title', isLessThanOrEqualTo: '$query\uf8ff')
+          .where('title', isLessThanOrEqualTo: '\$query\uf8ff')
           .get();
 
       return snapshot.docs
           .map((doc) => ProjectModel.fromJson({...doc.data(), 'id': doc.id}))
           .toList();
     } catch (e) {
-      throw Exception('Erreur lors de la recherche: $e');
+      throw Exception('Erreur lors de la recherche: \$e');
     }
   }
 }

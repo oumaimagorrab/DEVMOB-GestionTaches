@@ -22,7 +22,7 @@ class TaskService {
   }) async {
     try {
       final docRef = _firestore.collection(_collection).doc();
-      
+
       final task = TaskModel(
         id: docRef.id,
         projectId: projectId,
@@ -35,16 +35,16 @@ class TaskService {
         dueDate: dueDate,
       );
 
-      print('💾 Création tâche: $title (projectId: $projectId)');
-      print('📊 Task toJson: ${task.toJson()}');
-      
+      print('💾 Création tâche: \$title (projectId: \$projectId)');
+      print('📊 Task toJson: \${task.toJson()}');
+
       await docRef.set(task.toJson());
-      
-      print('✅ Tâche créée avec ID: ${docRef.id}');
+
+      print('✅ Tâche créée avec ID: \${docRef.id}');
       return task;
     } catch (e) {
-      print('❌ Erreur création: $e');
-      throw Exception('Erreur création tâche: $e');
+      print('❌ Erreur création: \$e');
+      throw Exception('Erreur création tâche: \$e');
     }
   }
 
@@ -56,26 +56,25 @@ class TaskService {
         .snapshots()
         .map((snapshot) {
           try {
-            print('📦 Snapshot reçu: ${snapshot.docs.length} documents');
-            
+            print('📦 Snapshot reçu: \${snapshot.docs.length} documents');
+
             final tasks = <TaskModel>[];
             for (var doc in snapshot.docs) {
               try {
                 final data = {...doc.data(), 'id': doc.id};
-                print('📄 Doc ${doc.id}: $data');
+                print('📄 Doc \${doc.id}: \$data');
                 final task = TaskModel.fromJson(data);
                 tasks.add(task);
               } catch (e) {
-                print('❌ Erreur parsing doc ${doc.id}: $e');
+                print('❌ Erreur parsing doc \${doc.id}: \$e');
               }
             }
-            
-            print('✅ ${tasks.length} tâches parsées');
-            // Trier localement
+
+            print('✅ \${tasks.length} tâches parsées');
             tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return tasks;
           } catch (e) {
-            print('❌ Erreur map stream: $e');
+            print('❌ Erreur map stream: \$e');
             return [];
           }
         });
@@ -91,8 +90,7 @@ class TaskService {
           final tasks = snapshot.docs
               .map((doc) => TaskModel.fromJson({...doc.data(), 'id': doc.id}))
               .toList();
-          
-          // Trier localement par dueDate
+
           tasks.sort((a, b) {
             if (a.dueDate == null && b.dueDate == null) return 0;
             if (a.dueDate == null) return 1;
@@ -112,20 +110,29 @@ class TaskService {
       }
       return null;
     } catch (e) {
-      throw Exception('Erreur récupération tâche: $e');
+      throw Exception('Erreur récupération tâche: \$e');
     }
   }
 
-  // Mettre à jour le statut
+  // ✅ CORRIGÉ: Mettre à jour le statut avec completedAt
   Future<void> updateStatus(String taskId, String newStatus) async {
     try {
       final isCompleted = newStatus == 'done';
-      await _firestore.collection(_collection).doc(taskId).update({
+      final updates = <String, dynamic>{
         'status': newStatus,
         'isCompleted': isCompleted,
-      });
+      };
+
+      // ✅ AJOUTÉ: Mettre completedAt si la tâche est terminée
+      if (isCompleted) {
+        updates['completedAt'] = Timestamp.fromDate(DateTime.now());
+      } else {
+        updates['completedAt'] = null;  // Reset si pas terminée
+      }
+
+      await _firestore.collection(_collection).doc(taskId).update(updates);
     } catch (e) {
-      throw Exception('Erreur mise à jour statut: $e');
+      throw Exception('Erreur mise à jour statut: \$e');
     }
   }
 
@@ -136,11 +143,11 @@ class TaskService {
         'assigneeId': assigneeId,
       });
     } catch (e) {
-      throw Exception('Erreur assignation: $e');
+      throw Exception('Erreur assignation: \$e');
     }
   }
 
-  // Mettre à jour une tâche complète
+  // ✅ CORRIGÉ: Mettre à jour une tâche avec completedAt
   Future<void> updateTask(
     String taskId, {
     String? title,
@@ -152,22 +159,29 @@ class TaskService {
   }) async {
     try {
       final updates = <String, dynamic>{};
-      
+
       if (title != null) updates['title'] = title;
       if (description != null) updates['description'] = description;
       if (status != null) {
         updates['status'] = status;
         updates['isCompleted'] = status == 'done';
+
+        // ✅ AJOUTÉ: Mettre à jour completedAt selon le status
+        if (status == 'done') {
+          updates['completedAt'] = Timestamp.fromDate(DateTime.now());
+        } else {
+          updates['completedAt'] = null;
+        }
       }
       if (priority != null) updates['priority'] = priority;
       if (assigneeId != null) updates['assigneeId'] = assigneeId;
-      if (dueDate != null) updates['dueDate'] = dueDate.toIso8601String();
+      if (dueDate != null) updates['dueDate'] = Timestamp.fromDate(dueDate);
 
       if (updates.isNotEmpty) {
         await _firestore.collection(_collection).doc(taskId).update(updates);
       }
     } catch (e) {
-      throw Exception('Erreur mise à jour: $e');
+      throw Exception('Erreur mise à jour: \$e');
     }
   }
 
@@ -178,7 +192,7 @@ class TaskService {
         'comments': FieldValue.arrayUnion([comment]),
       });
     } catch (e) {
-      throw Exception('Erreur ajout commentaire: $e');
+      throw Exception('Erreur ajout commentaire: \$e');
     }
   }
 
@@ -187,7 +201,7 @@ class TaskService {
     try {
       await _firestore.collection(_collection).doc(taskId).delete();
     } catch (e) {
-      throw Exception('Erreur suppression: $e');
+      throw Exception('Erreur suppression: \$e');
     }
   }
 
@@ -210,7 +224,7 @@ class TaskService {
         'done': tasks.where((t) => t.status == 'done').length,
       };
     } catch (e) {
-      throw Exception('Erreur stats: $e');
+      throw Exception('Erreur stats: \$e');
     }
   }
 }

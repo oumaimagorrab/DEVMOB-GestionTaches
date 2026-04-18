@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'create_project_page.dart'; 
 import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
 
 class AdminDashboardPage extends StatefulWidget {
-  
+
   const AdminDashboardPage({super.key});
 
   @override
@@ -15,26 +16,148 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
 
+  // Variables pour les statistiques dynamiques
+  int _activeProjects = 0;
+  int _completedTasks = 0;
+  int _lateTasks = 0;
+  int _activeMembers = 0;
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _recentMembers = [];
+  String? _currentUserId;
+  
+  // Variables pour le nom et le rôle
+  String _displayName = "Utilisateur";
+  bool _isAdmin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    _loadUserData();  // Charger d'abord les infos utilisateur
+    _loadDashboardData();
+  }
+
+  // Charger les infos de l'utilisateur connecté
+  Future<void> _loadUserData() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        setState(() {
+          // Vérifier si c'est un admin
+          _isAdmin = userData['role'] == 'admin' || userData['isAdmin'] == true;
+          
+          // Définir le nom à afficher
+          if (_isAdmin) {
+            _displayName = "Admin";
+          } else {
+            // Pour les collaborateurs, utiliser le nom stocké dans Firestore
+            _displayName = userData['name'] ?? 
+                          userData['displayName'] ?? 
+                          currentUser.displayName ?? 
+                          "Collaborateur";
+          }
+        });
+      } else {
+        // Si pas de document Firestore, utiliser Firebase Auth
+        setState(() {
+          _displayName = currentUser.displayName ?? "Utilisateur";
+        });
+      }
+    } catch (e) {
+      print('Erreur chargement user data: $e');
+      setState(() {
+        _displayName = FirebaseAuth.instance.currentUser?.displayName ?? "Utilisateur";
+      });
+    }
+  }
+
+  // Chargement des données depuis Firestore
+  Future<void> _loadDashboardData() async {
+    try {
+      setState(() => _isLoading = true);
+
+      final firestore = FirebaseFirestore.instance;
+      final now = DateTime.now();
+      final weekAgo = now.subtract(const Duration(days: 7));
+
+      // 1. Compter les projets actifs
+      final projectsSnapshot = await firestore
+          .collection('projects')
+          .where('status', isEqualTo: 'active')
+          .get();
+
+      // 2. Compter les tâches terminées cette semaine
+      final completedTasksSnapshot = await firestore
+          .collection('tasks')
+          .where('status', isEqualTo: 'completed')
+          .where('completedAt', isGreaterThanOrEqualTo: weekAgo)
+          .get();
+
+      // 3. Compter les tâches en retard
+      final lateTasksSnapshot = await firestore
+          .collection('tasks')
+          .where('dueDate', isLessThan: now)
+          .where('status', whereIn: ['pending', 'in_progress'])
+          .get();
+
+      // 4. Compter les membres actifs (collaborateurs uniquement)
+      final membersSnapshot = await firestore
+          .collection('users')
+          .where('role', isEqualTo: 'collaborateur')
+          .get();
+
+      // 5. Récupérer les membres récents pour les avatars
+      final recentMembersSnapshot = await firestore
+          .collection('users')
+          .where('role', isEqualTo: 'collaborateur')
+          .orderBy('createdAt', descending: true)
+          .limit(3)
+          .get();
+
+      final recentMembers = recentMembersSnapshot.docs.map((doc) => {
+        'id': doc.id,
+        'name': doc.data()['displayName'] ?? doc.data()['name'] ?? 'Utilisateur',
+        'photoURL': doc.data()['photoURL'] ?? doc.data()['avatarUrl'],
+      }).toList();
+
+      setState(() {
+        _activeProjects = projectsSnapshot.docs.length;
+        _completedTasks = completedTasksSnapshot.docs.length;
+        _lateTasks = lateTasksSnapshot.docs.length;
+        _activeMembers = membersSnapshot.docs.length;
+        _recentMembers = recentMembers;
+        _isLoading = false;
+      });
+
+    } catch (e) {
+      print('Erreur chargement dashboard: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final dateFormat = DateFormat('EEEE d MMMM yyyy', 'fr_FR');
-    final User? user = FirebaseAuth.instance.currentUser;
-    final String userName = user?.displayName ?? "Utilisateur";
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
-            // Header modifié - SEULEMENT NOTIFICATION
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Notification avec badge
                   Stack(
                     children: [
                       const Icon(
@@ -59,130 +182,114 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ],
               ),
             ),
-            
-            // Contenu scrollable
+
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    
-                    // Salutation
-                    Text(
-                      'Bonjour $userName ! 👋',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await _loadUserData();  // Recharger aussi les infos user
+                  await _loadDashboardData();
+                },
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+
+                      // Salutation dynamique selon le rôle
+                      Text(
+                        'Bonjour $_displayName !',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Date
-                    Text(
-                      dateFormat.format(now),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Sous-titre
-                    RichText(
-                      text: TextSpan(
+
+                      const SizedBox(height: 8),
+
+                      Text(
+                        dateFormat.format(now),
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
                         ),
-                        children: const [
-                          TextSpan(text: 'Vous avez '),
-                          TextSpan(
-                            text: '3 tâches',
-                            style: TextStyle(
-                              color: Color(0xFF6B4EFF),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          TextSpan(text: ' en attente aujourd\'hui'),
-                        ],
                       ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Grille de statistiques
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.85,
-                      children: [
-                        // Projets actifs
-                        _buildStatCard(
-                          icon: Icons.folder_outlined,
-                          iconColor: const Color(0xFF6B4EFF),
-                          iconBgColor: const Color(0xFF6B4EFF).withOpacity(0.1),
-                          value: '12',
-                          label: 'Projets actifs',
-                          footer: '+2 ce mois',
-                          footerColor: Colors.green,
-                        ),
-                        
-                        // Tâches terminées
-                        _buildStatCard(
-                          icon: Icons.check_circle_outline,
-                          iconColor: Colors.green,
-                          iconBgColor: Colors.green.withOpacity(0.1),
-                          value: '48',
-                          label: 'Tâches terminées',
-                          footer: 'cette semaine',
-                          footerColor: Colors.grey.shade600,
-                          showProgressBar: true,
-                          progressColor: Colors.green,
-                        ),
-                        
-                        // Tâches en retard
-                        _buildStatCard(
-                          icon: Icons.error_outline,
-                          iconColor: Colors.red,
-                          iconBgColor: Colors.red.withOpacity(0.1),
-                          value: '3',
-                          label: 'Tâches en retard',
-                          showBadge: true,
-                        ),
-                        
-                        // Membres actifs
-                        _buildStatCard(
-                          icon: Icons.people_outline,
-                          iconColor: Colors.orange,
-                          iconBgColor: Colors.orange.withOpacity(0.1),
-                          value: '8',
-                          label: 'Membres actifs',
-                          showAvatars: true,
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 100), // Espace pour le FAB
-                  ],
+
+                      const SizedBox(height: 24),
+
+                      _isLoading
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(40),
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF6B4EFF),
+                                ),
+                              ),
+                            )
+                          : GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 0.85,
+                              children: [
+                                _buildStatCard(
+                                  icon: Icons.folder_outlined,
+                                  iconColor: const Color(0xFF6B4EFF),
+                                  iconBgColor: const Color(0xFF6B4EFF).withOpacity(0.1),
+                                  value: _activeProjects.toString(),
+                                  label: 'Projets actifs',
+                                  footer: '+2 ce mois',
+                                  footerColor: Colors.green,
+                                ),
+
+                                _buildStatCard(
+                                  icon: Icons.check_circle_outline,
+                                  iconColor: Colors.green,
+                                  iconBgColor: Colors.green.withOpacity(0.1),
+                                  value: _completedTasks.toString(),
+                                  label: 'Tâches terminées',
+                                  footer: 'cette semaine',
+                                  footerColor: Colors.grey.shade600,
+                                  showProgressBar: true,
+                                  progressColor: Colors.green,
+                                ),
+
+                                _buildStatCard(
+                                  icon: Icons.error_outline,
+                                  iconColor: Colors.red,
+                                  iconBgColor: Colors.red.withOpacity(0.1),
+                                  value: _lateTasks.toString(),
+                                  label: 'Tâches en retard',
+                                  showBadge: _lateTasks > 0,
+                                ),
+
+                                _buildStatCard(
+                                  icon: Icons.people_outline,
+                                  iconColor: Colors.orange,
+                                  iconBgColor: Colors.orange.withOpacity(0.1),
+                                  value: _activeMembers.toString(),
+                                  label: 'Membres actifs',
+                                  showAvatars: _recentMembers.isNotEmpty,
+                                  members: _recentMembers,
+                                ),
+                              ],
+                            ),
+
+                      const SizedBox(height: 100),
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
         ),
       ),
-      
-      // Bottom Navigation Bar modifiée - Profil à la place de Plus
+
       floatingActionButton: GestureDetector(
         onTap: () {
-          // ✅ NAVIGATION VERS CREATE PROJECT
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CreateProjectPage()),
@@ -214,7 +321,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      
+
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -234,9 +341,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               children: [
                 _buildNavItem(Icons.home_outlined, 'Accueil', 0),
                 _buildNavItem(Icons.folder_outlined, 'Projets', 1),
-                const SizedBox(width: 56), // Espace pour le FAB
+                const SizedBox(width: 56),
                 _buildNavItem(Icons.people_outline, 'Équipe', 2),
-                _buildNavItem(Icons.person_outline, 'Profil', 3), // ✅ REMPLACÉ Plus par Profil
+                _buildNavItem(Icons.person_outline, 'Profil', 3),
               ],
             ),
           ),
@@ -257,6 +364,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Color? progressColor,
     bool showBadge = false,
     bool showAvatars = false,
+    List<Map<String, dynamic>>? members,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -300,9 +408,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
             ],
           ),
-          
+
           const Spacer(),
-          
+
           Text(
             value,
             style: const TextStyle(
@@ -311,9 +419,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               color: Colors.black87,
             ),
           ),
-          
+
           const SizedBox(height: 4),
-          
+
           Text(
             label,
             style: TextStyle(
@@ -322,7 +430,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               height: 1.2,
             ),
           ),
-          
+
           if (footer != null) ...[
             const SizedBox(height: 8),
             Row(
@@ -345,7 +453,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
           ],
-          
+
           if (showProgressBar) ...[
             const SizedBox(height: 12),
             Container(
@@ -365,14 +473,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
             ),
           ],
-          
-          if (showAvatars) ...[
+
+          if (showAvatars && members != null && members.isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
               height: 24,
               child: Stack(
                 children: [
-                  for (int i = 0; i < 3; i++)
+                  for (int i = 0; i < members.length && i < 3; i++)
                     Positioned(
                       left: i * 16,
                       child: Container(
@@ -381,13 +489,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
-                          image: DecorationImage(
-                            image: NetworkImage(
-                              'https://i.pravatar.cc/150?img=${10 + i}',
-                            ),
-                            fit: BoxFit.cover,
-                          ),
+                          color: Colors.grey.shade300,
                         ),
+                        child: members[i]['photoURL'] != null
+                            ? ClipOval(
+                                child: Image.network(
+                                  members[i]['photoURL'],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                    Center(
+                                      child: Text(
+                                        members[i]['name'][0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  members[i]['name'][0].toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                 ],
@@ -401,25 +532,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedIndex = index;
         });
-          
-        // ✅ NAVIGATION SELON L'INDEX
+
         switch (index) {
-          case 0: // Accueil
-            // Déjà sur Dashboard
+          case 0:
             break;
-          case 1: // Projets
+          case 1:
             Navigator.pushNamed(context, '/projects');
             break;
-          case 2: // Équipe
+          case 2:
             Navigator.pushNamed(context, '/team');
             break;
-          case 3: // Profil ✅ NAVIGATION VERS PROFIL
+          case 3:
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const ProfilePage()),
