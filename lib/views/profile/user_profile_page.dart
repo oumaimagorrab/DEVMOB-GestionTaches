@@ -5,6 +5,7 @@ import 'package:gestiontaches/views/auth/ajoutermembre_page.dart';
 import 'package:gestiontaches/views/project/create_project_page.dart';
 import 'package:gestiontaches/views/project/dashboard_page.dart';
 import 'package:gestiontaches/views/project/project_liste_page.dart';
+import 'package:gestiontaches/views/project/collaborator_projects_page.dart';
 import 'package:gestiontaches/views/profile/team_member_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -15,7 +16,46 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  int _selectedIndex = 3;
+  int _selectedIndex = 0;
+  bool _isCurrentUserAdmin = false;
+  bool _isLoadingRole = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserRole();
+  }
+
+  // 🔥 VÉRIFIER LE RÔLE DE L'UTILISATEUR
+  Future<void> _checkUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _isLoadingRole = false);
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final isAdmin = data['role'] == 'admin' || data['isAdmin'] == true;
+        setState(() {
+          _isCurrentUserAdmin = isAdmin;
+          _selectedIndex = isAdmin ? 3 : 2;
+          _isLoadingRole = false;
+        });
+      } else {
+        setState(() => _isLoadingRole = false);
+      }
+    } catch (e) {
+      print('Erreur vérification rôle: $e');
+      setState(() => _isLoadingRole = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,213 +63,312 @@ class _ProfilePageState extends State<ProfilePage> {
     final String userName = user?.displayName ?? "Jean Dupont";
     final String userEmail = user?.email ?? "jean.dupont@devmob.com";
 
+    final String roleBadge = _isCurrentUserAdmin ? 'Admin' : 'Collaborateur';
+    final Color roleColor = _isCurrentUserAdmin ? const Color(0xFF6B4EFF) : const Color(0xFF5B5BD6);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
+      body: _isLoadingRole
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6B4EFF)))
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 40),
 
-              // Photo de profil avec badge caméra
-              Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      image: const DecorationImage(
-                        image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                        fit: BoxFit.cover,
-                      ),
-                      border: Border.all(color: Colors.white, width: 4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: const DecorationImage(
+                              image: NetworkImage('https://i.pravatar.cc/150?img=11'),
+                              fit: BoxFit.cover,
+                            ),
+                            border: Border.all(color: Colors.white, width: 4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _showImagePickerOptions,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6B4EFF),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF6B4EFF).withOpacity(0.4),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: _showImagePickerOptions,
-                    child: Container(
-                      width: 32,
-                      height: 32,
+
+                    const SizedBox(height: 16),
+
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      userEmail,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B4EFF),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6B4EFF).withOpacity(0.4),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                        color: roleColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        roleBadge,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    _buildMenuItem(
+                      icon: Icons.edit_outlined,
+                      title: 'Modifier Profil',
+                      onTap: _navigateToEditProfile,
+                    ),
+
+                    _buildMenuItem(
+                      icon: Icons.help_outline,
+                      title: 'Aide',
+                      onTap: _navigateToHelp,
+                    ),
+
+                    _buildMenuItem(
+                      icon: Icons.shield_outlined,
+                      title: 'Confidentialité',
+                      onTap: _navigateToPrivacy,
+                    ),
+
+                    _buildMenuItem(
+                      icon: Icons.info_outline,
+                      title: 'À propos',
+                      onTap: _navigateToAbout,
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: _showLogoutConfirmation,
+                        icon: const Icon(Icons.logout, size: 20, color: Colors.red),
+                        label: const Text(
+                          'Se déconnecter',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
                           ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 120),
+                  ],
+                ),
+              ),
+            ),
+
+      floatingActionButton: _isCurrentUserAdmin
+          ? GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/createprojects'),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6B4EFF), Color(0xFF8B5CF6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6B4EFF).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
+              ),
+            )
+          : null,
+      floatingActionButtonLocation: _isCurrentUserAdmin
+          ? FloatingActionButtonLocation.centerDocked
+          : null,
+
+      bottomNavigationBar: _isLoadingRole
+          ? const SizedBox.shrink()
+          : _isCurrentUserAdmin
+              ? Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildAdminNavItem(Icons.home_outlined, 'Accueil', 0),
+                          _buildAdminNavItem(Icons.folder_outlined, 'Projets', 1),
+                          const SizedBox(width: 56),
+                          _buildAdminNavItem(Icons.people_outline, 'Équipe', 2),
+                          _buildAdminNavItem(Icons.person_outline, 'Profil', 3),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 16,
-                      ),
                     ),
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              Text(
-                userName,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                userEmail,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6B4EFF),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Admin',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              _buildMenuItem(
-                icon: Icons.edit_outlined,
-                title: 'Modifier Profil',
-                onTap: _navigateToEditProfile,
-              ),
-
-              _buildMenuItem(
-                icon: Icons.help_outline,
-                title: 'Aide',
-                onTap: _navigateToHelp,
-              ),
-
-              _buildMenuItem(
-                icon: Icons.shield_outlined,
-                title: 'Confidentialité',
-                onTap: _navigateToPrivacy,
-              ),
-
-              _buildMenuItem(
-                icon: Icons.info_outline,
-                title: 'À propos',
-                onTap: _navigateToAbout,
-              ),
-
-              const SizedBox(height: 32),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: _showLogoutConfirmation,
-                  icon: const Icon(Icons.logout, size: 20, color: Colors.red),
-                  label: const Text(
-                    'Se déconnecter',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red,
+                )
+              : BottomNavigationBar(
+                  currentIndex: _selectedIndex,
+                  onTap: (index) {
+                    setState(() => _selectedIndex = index);
+                    switch (index) {
+                      case 0:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const CollaboratorProjectsPage()),
+                        );
+                        break;
+                      case 1:
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const TeamMembersPage()),
+                        );
+                        break;
+                      case 2:
+                        break;
+                    }
+                  },
+                  backgroundColor: Colors.white,
+                  elevation: 8,
+                  selectedItemColor: const Color(0xFF5B5BD6),
+                  unselectedItemColor: Colors.grey.shade400,
+                  type: BottomNavigationBarType.fixed,
+                  items: const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.folder_outlined),
+                      label: 'Projets',
                     ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.people_outline),
+                      label: 'Équipe',
                     ),
-                  ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline),
+                      label: 'Profil',
+                    ),
+                  ],
                 ),
-              ),
+    );
+  }
 
-              const SizedBox(height: 120),
-            ],
+  Widget _buildAdminNavItem(IconData icon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        if (_selectedIndex == index) return;
+        setState(() => _selectedIndex = index);
+
+        switch (index) {
+          case 0:
+            Navigator.pushNamed(context, '/dashboard');
+            break;
+          case 1:
+            Navigator.pushNamed(context, '/projects');
+            break;
+          case 2:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const TeamMembersPage()),
+            );
+            break;
+          case 3:
+            break;
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
+            size: 24,
           ),
-        ),
-      ),
-
-      floatingActionButton: GestureDetector(
-        onTap: () => Navigator.pushNamed(context, '/createprojects'),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6B4EFF), Color(0xFF8B5CF6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6B4EFF).withOpacity(0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.add, color: Colors.white, size: 28),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home_outlined, 'Accueil', 0),
-                _buildNavItem(Icons.folder_outlined, 'Projets', 1),
-                const SizedBox(width: 56),
-                _buildNavItem(Icons.people_outline, 'Équipe', 2),
-                _buildNavItem(Icons.person_outline, 'Profil', 3),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -719,51 +858,6 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final bool isSelected = _selectedIndex == index;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-        switch (index) {
-          case 0:
-            Navigator.pushNamed(context, '/dashboard');
-            break;
-          case 1:
-            Navigator.pushNamed(context, '/projects');
-            break;
-          case 2:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TeamMembersPage()),
-            );
-            break;
-          case 3:
-            break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade500,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // 🎯 PAGE MODIFIER PROFIL - FONCTIONNELLE AVEC FIRESTORE
@@ -798,7 +892,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  // 🔥 CHARGER LES DONNÉES DEPUIS FIRESTORE
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -817,8 +910,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (doc.exists) {
         final data = doc.data()!;
         final fullName = data['name'] ?? user.displayName ?? '';
-
-        // Séparer nom et prénom (suppose "Prénom Nom" ou juste un nom)
         final nameParts = fullName.trim().split(' ');
         if (nameParts.length >= 2) {
           _firstNameController.text = nameParts.first;
@@ -827,10 +918,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           _firstNameController.text = fullName;
           _lastNameController.text = '';
         }
-
         _emailController.text = data['email'] ?? user.email ?? '';
       } else {
-        // Fallback sur Firebase Auth
         final fullName = user.displayName ?? '';
         final nameParts = fullName.trim().split(' ');
         if (nameParts.length >= 2) {
@@ -848,7 +937,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _isLoading = false);
   }
 
-  // 🔥 SAUVEGARDER LES MODIFICATIONS
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -863,17 +951,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final fullName = '$firstName $lastName'.trim();
       final email = _emailController.text.trim();
 
-      // 1. Mettre à jour Firestore
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
         'name': fullName,
         'email': email,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. Mettre à jour Firebase Auth (displayName)
       await user.updateDisplayName(fullName);
 
-      // 3. Mettre à jour l'email si différent
       if (email != user.email) {
         await user.verifyBeforeUpdateEmail(email);
         _showSuccess('Un email de vérification a été envoyé à $email');
@@ -967,7 +1052,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Photo de profil
                     Stack(
                       alignment: Alignment.bottomRight,
                       children: [
@@ -1006,30 +1090,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Champ Prénom
                     _buildTextField(
                       controller: _firstNameController,
                       label: 'Prénom',
                       icon: Icons.person_outline,
                       validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
                     ),
-
                     const SizedBox(height: 16),
-
-                    // Champ Nom
                     _buildTextField(
                       controller: _lastNameController,
                       label: 'Nom',
                       icon: Icons.person_outline,
                       validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
                     ),
-
                     const SizedBox(height: 16),
-
-                    // Champ Email
                     _buildTextField(
                       controller: _emailController,
                       label: 'Email',
@@ -1041,10 +1116,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         return null;
                       },
                     ),
-
                     const SizedBox(height: 32),
-
-                    // Bouton Sauvegarder
                     SizedBox(
                       width: double.infinity,
                       height: 50,

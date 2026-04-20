@@ -152,7 +152,7 @@ class _WelcomePageState extends State<WelcomePage>
                                 end: Alignment.bottomRight,
                               ).createShader(bounds),
                               child: const Text(
-                                "Co-Work Pro",
+                                "TaskFlow",
                                 style: TextStyle(
                                   fontSize: 36,
                                   fontWeight: FontWeight.bold,

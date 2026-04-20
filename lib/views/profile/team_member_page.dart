@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
 import 'package:gestiontaches/views/auth/ajoutermembre_page.dart';
+import 'package:gestiontaches/views/project/collaborator_projects_page.dart';
 
 class TeamMembersPage extends StatefulWidget {
   const TeamMembersPage({super.key});
@@ -12,7 +13,7 @@ class TeamMembersPage extends StatefulWidget {
 }
 
 class _TeamMembersPageState extends State<TeamMembersPage> {
-  int _selectedIndex = 2;
+  int _selectedIndex = 1; // Équipe est sélectionnée par défaut
   bool _isLoading = true;
   String? _currentUserId;
   bool _isCurrentUserAdmin = false;
@@ -25,7 +26,30 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
   void initState() {
     super.initState();
     _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    _checkUserRole();
     _loadTeamMembers();
+  }
+
+  // 🔥 VÉRIFIER LE RÔLE DE L'UTILISATEUR
+  Future<void> _checkUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          _isCurrentUserAdmin = data['role'] == 'admin' || data['isAdmin'] == true;
+        });
+      }
+    } catch (e) {
+      print('Erreur vérification rôle: $e');
+    }
   }
 
   // 🔥 RÉCUPÉRATION DYNAMIQUE DES MEMBRES DEPUIS FIRESTORE
@@ -33,7 +57,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
     setState(() => _isLoading = true);
     
     try {
-      // Écoute en temps réel de la collection users
       FirebaseFirestore.instance
           .collection('users')
           .snapshots()
@@ -52,12 +75,10 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
             'isAdmin': data['role'] == 'admin' || data['isAdmin'] == true,
           };
 
-          // Vérifier si c'est l'utilisateur courant
           if (doc.id == _currentUserId) {
             _isCurrentUserAdmin = member['isAdmin'];
           }
 
-          // Trier par rôle
           if (member['isAdmin']) {
             admins.add(member);
           } else {
@@ -77,80 +98,61 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
     }
   }
 
-  // 🔥 PROMOUVOIR UN MEMBRE (admin uniquement)
+  // ... (toutes les méthodes existantes: _promoteMember, _demoteMember, etc.) ...
+
   Future<void> _promoteMember(String memberId) async {
     if (!_isCurrentUserAdmin) {
       _showError('Seuls les administrateurs peuvent promouvoir des membres');
       return;
     }
-
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(memberId)
-          .update({
+      await FirebaseFirestore.instance.collection('users').doc(memberId).update({
         'role': 'admin',
         'isAdmin': true,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-
       _showSuccess('Membre promu administrateur avec succès');
     } catch (e) {
       _showError('Erreur lors de la promotion: $e');
     }
   }
 
-  // 🔥 RÉTROGRADER UN ADMIN (admin uniquement)
   Future<void> _demoteMember(String memberId) async {
     if (!_isCurrentUserAdmin) {
       _showError('Action non autorisée');
       return;
     }
-
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(memberId)
-          .update({
+      await FirebaseFirestore.instance.collection('users').doc(memberId).update({
         'role': 'member',
         'isAdmin': false,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-
       _showSuccess('Administrateur rétrogradé en membre');
     } catch (e) {
       _showError('Erreur: $e');
     }
   }
 
-  // 🔥 SUPPRIMER UN MEMBRE (admin uniquement)
   Future<void> _removeMember(String memberId) async {
     if (!_isCurrentUserAdmin) {
       _showError('Action non autorisée');
       return;
     }
-
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(memberId)
-          .delete();
-
+      await FirebaseFirestore.instance.collection('users').doc(memberId).delete();
       _showSuccess('Membre retiré avec succès');
     } catch (e) {
       _showError('Erreur lors de la suppression: $e');
     }
   }
 
-  // 🔥 AJOUTER UN MEMBRE PAR EMAIL
   Future<void> _addMemberByEmail(String email) async {
     if (!_isCurrentUserAdmin) {
       _showError('Seuls les administrateurs peuvent ajouter des membres');
       return;
     }
-
     try {
-      // Vérifier si l'email existe déjà
       final existing = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: email)
@@ -161,17 +163,15 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         return;
       }
 
-      // Créer un compte temporaire/en attente
       await FirebaseFirestore.instance.collection('users').add({
         'email': email,
         'name': 'Nouveau Membre',
         'role': 'member',
         'isAdmin': false,
-        'status': 'pending', // En attente d'acceptation
+        'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
         'imageUrl': 'https://i.pravatar.cc/150?img=${DateTime.now().millisecond}',
       });
-
       _showSuccess('Invitation envoyée à $email');
     } catch (e) {
       _showError('Erreur: $e');
@@ -207,7 +207,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                 ),
                 const SizedBox(height: 20),
                 
-                // Option Promouvoir/Rétrograder (admin uniquement)
                 if (_isCurrentUserAdmin && !isCurrentUser) ...[
                   ListTile(
                     leading: Container(
@@ -235,7 +234,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   const SizedBox(height: 8),
                 ],
 
-                // Option Supprimer (admin uniquement, pas soi-même)
                 if (_isCurrentUserAdmin && !isCurrentUser)
                   ListTile(
                     leading: Container(
@@ -253,7 +251,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                     },
                   ),
 
-                // Si pas admin, message informatif
                 if (!_isCurrentUserAdmin)
                   Padding(
                     padding: const EdgeInsets.all(16),
@@ -342,7 +339,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         ),
         centerTitle: true,
         actions: [
-          // Indicateur admin dans l'AppBar
           if (_isCurrentUserAdmin)
             Container(
               margin: const EdgeInsets.only(right: 16),
@@ -377,7 +373,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Section Administrateurs
                     if (administrators.isNotEmpty) ...[
                       Row(
                         children: [
@@ -407,19 +402,14 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                           ),
                         ],
                       ),
-                      
                       const SizedBox(height: 12),
-                      
-                      // Liste des administrateurs
                       ...administrators.map((admin) => _buildMemberCard(
                         member: admin,
                         onMorePressed: () => _showOptionsMenu(context, admin),
                       )),
-                      
                       const SizedBox(height: 24),
                     ],
                     
-                    // Section Collaborateurs
                     Row(
                       children: [
                         const Text(
@@ -451,7 +441,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                     
                     const SizedBox(height: 12),
                     
-                    // Container des collaborateurs
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -460,7 +449,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       ),
                       child: Column(
                         children: [
-                          // Liste des collaborateurs
                           if (collaborators.isEmpty)
                             Padding(
                               padding: const EdgeInsets.all(32),
@@ -497,7 +485,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                               );
                             }),
                           
-                          // Bouton Ajouter (visible uniquement pour les admins)
                           if (_isCurrentUserAdmin)
                             Padding(
                               padding: const EdgeInsets.all(16),
@@ -535,64 +522,155 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               ),
             ),
       
-      // FAB et BottomNav identiques...
-      floatingActionButton: GestureDetector(
-        onTap: () {
-          Navigator.pushNamed(context, '/createprojects');
-        },
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6B4EFF), Color(0xFF8B5CF6)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6B4EFF).withOpacity(0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+      // 🎯 NAVIGATION ADAPTATIVE SELON LE RÔLE
+      // Admin: FAB + BottomNav custom (4 items)
+      // Collaborateur: BottomNavigationBar standard (3 items) comme CollaboratorProjectsPage
+      floatingActionButton: _isCurrentUserAdmin
+          ? GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/createprojects'),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6B4EFF), Color(0xFF8B5CF6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6B4EFF).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
               ),
-            ],
-          ),
-          child: const Icon(
-            Icons.add,
-            color: Colors.white,
-            size: 28,
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+            )
+          : null,
+      floatingActionButtonLocation: _isCurrentUserAdmin
+          ? FloatingActionButtonLocation.centerDocked
+          : null,
       
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home_outlined, 'Accueil', 0),
-                _buildNavItem(Icons.folder_outlined, 'Projets', 1),
-                const SizedBox(width: 56),
-                _buildNavItem(Icons.people_outline, 'Équipe', 2),
-                _buildNavItem(Icons.person_outline, 'Profil', 3),
+      bottomNavigationBar: _isCurrentUserAdmin
+          // 🎯 MENU ADMIN (4 items + FAB)
+          ? Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildAdminNavItem(Icons.home_outlined, 'Accueil', 0),
+                      _buildAdminNavItem(Icons.folder_outlined, 'Projets', 1),
+                      const SizedBox(width: 56),
+                      _buildAdminNavItem(Icons.people_outline, 'Équipe', 2),
+                      _buildAdminNavItem(Icons.person_outline, 'Profil', 3),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          // 🎯 MENU COLLABORATEUR (3 items) - Identique à CollaboratorProjectsPage
+          : BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() => _selectedIndex = index);
+                switch (index) {
+                  case 0:
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CollaboratorProjectsPage()),
+                    );
+                    break;
+                  case 1:
+                    // Déjà sur Équipe
+                    break;
+                  case 2:
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfilePage()),
+                    );
+                    break;
+                }
+              },
+              backgroundColor: Colors.white,
+              elevation: 8,
+              selectedItemColor: const Color(0xFF5B5BD6),
+              unselectedItemColor: Colors.grey.shade400,
+              type: BottomNavigationBarType.fixed,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.folder_outlined),
+                  label: 'Projets',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people_outline),
+                  label: 'Équipe',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline),
+                  label: 'Profil',
+                ),
               ],
             ),
+    );
+  }
+
+  // 🎯 NAV ITEM POUR ADMIN (custom)
+  Widget _buildAdminNavItem(IconData icon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedIndex = index);
+        switch (index) {
+          case 0:
+            Navigator.pushNamed(context, '/dashboard');
+            break;
+          case 1:
+            Navigator.pushNamed(context, '/projects');
+            break;
+          case 2:
+            break;
+          case 3:
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
+            break;
+        }
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
+            size: 24,
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -654,11 +732,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onMorePressed,
-            child: Icon(
-              Icons.more_vert,
-              color: Colors.grey.shade400,
-              size: 20,
-            ),
+            child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
           ),
         ],
       ),
@@ -719,11 +793,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: onMorePressed,
-                child: Icon(
-                  Icons.more_vert,
-                  color: Colors.grey.shade400,
-                  size: 20,
-                ),
+                child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
               ),
             ],
           ),
@@ -743,10 +813,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                 ),
                 child: const Text(
                   'Promouvoir',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -773,54 +840,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedIndex == index;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-
-        switch (index) {
-          case 0:
-            Navigator.pushNamed(context, '/dashboard');
-            break;
-          case 1:
-            Navigator.pushNamed(context, '/projects');
-            break;
-          case 2:
-            break;
-          case 3:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
-            );
-            break;
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showAddMemberOptions() {
     showModalBottomSheet(
       context: context,
@@ -836,7 +855,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Indicateur de drag
                 Container(
                   width: 40,
                   height: 4,
@@ -846,26 +864,17 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
                 const Text(
                   'Ajouter un membre',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Choisissez comment ajouter le nouveau membre',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                
-                // Option 1: Par email (invitation)
                 ListTile(
                   onTap: () {
                     Navigator.pop(context);
@@ -877,48 +886,23 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       color: const Color(0xFF6B4EFF).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.email_outlined,
-                      color: Color(0xFF6B4EFF),
-                      size: 24,
-                    ),
+                    child: const Icon(Icons.email_outlined, color: Color(0xFF6B4EFF), size: 24),
                   ),
-                  title: const Text(
-                    'Par email',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Envoyer une invitation par email',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 13,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    color: Colors.grey.shade400,
-                  ),
+                  title: const Text('Par email', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  subtitle: Text('Envoyer une invitation par email', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(color: Colors.grey.shade200),
                   ),
                 ),
-                
                 const SizedBox(height: 12),
-                
-                // Option 2: Nouveau compte
                 ListTile(
                   onTap: () {
                     Navigator.pop(context);
-                    // 🔥 NAVIGATION VERS CreateAccountPage
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreateAccountPage(),
-                      ),
+                      MaterialPageRoute(builder: (context) => const CreateAccountPage()),
                     );
                   },
                   leading: Container(
@@ -927,36 +911,16 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       color: Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.person_add_outlined,
-                      color: Colors.green,
-                      size: 24,
-                    ),
+                    child: const Icon(Icons.person_add_outlined, color: Colors.green, size: 24),
                   ),
-                  title: const Text(
-                    'Nouveau compte',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Créer un compte pour le membre',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 13,
-                    ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right,
-                    color: Colors.grey.shade400,
-                  ),
+                  title: const Text('Nouveau compte', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  subtitle: Text('Créer un compte pour le membre', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(color: Colors.grey.shade200),
                   ),
                 ),
-                
                 const SizedBox(height: 16),
               ],
             ),
@@ -965,9 +929,9 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       ),
     );
   }
+
   void _showAddMemberByEmailDialog() {
     final emailController = TextEditingController();
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -978,18 +942,9 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
           decoration: InputDecoration(
             hintText: 'Email du membre',
             prefixIcon: const Icon(Icons.email_outlined),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF6B4EFF)),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6B4EFF))),
           ),
           keyboardType: TextInputType.emailAddress,
         ),
