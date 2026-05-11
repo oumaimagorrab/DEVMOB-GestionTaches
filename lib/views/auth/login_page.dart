@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ← AJOUTÉ
+import 'package:shared_preferences/shared_preferences.dart';
 import 'register_page.dart';
 import 'package:gestiontaches/views/project/dashboard_page.dart';
 import 'package:gestiontaches/views/project/collaborator_projects_page.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import 'package:firebase_app_check/firebase_app_check.dart'; // ← AJOUTÉ pour App Check
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -24,7 +28,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   bool _obscurePassword = true;
-  bool _rememberMe = false; // ← AJOUTÉ : case à cocher
+  bool _rememberMe = false;
   
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -44,6 +48,36 @@ class _LoginScreenState extends State<LoginScreen>
     _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _logoController, curve: Curves.easeInOut),
     );
+    
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('saved_email') ?? '';
+    final savedPassword = prefs.getString('saved_password') ?? '';
+    final rememberMe = prefs.getBool('remember_me') ?? false;
+    
+    if (rememberMe && savedEmail.isNotEmpty) {
+      setState(() {
+        _emailController.text = savedEmail;
+        _passwordController.text = savedPassword;
+        _rememberMe = true;
+      });
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe) {
+      await prefs.setString('saved_email', _emailController.text.trim());
+      await prefs.setString('saved_password', _passwordController.text);
+      await prefs.setBool('remember_me', true);
+    } else {
+      await prefs.remove('saved_email');
+      await prefs.remove('saved_password');
+      await prefs.setBool('remember_me', false);
+    }
   }
 
   @override
@@ -65,6 +99,8 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     if (success && mounted) {
+      await _saveCredentials();
+
       if (authProvider.isAdmin) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -83,13 +119,11 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-    Future<void> _signInWithGoogle() async {
+  Future<void> _signInWithGoogle() async {
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-
     final success = await authProvider.signInWithGoogle();
 
     if (success && mounted) {
-      // ✅ CORRIGÉ : Redirection selon le rôle comme pour l'email
       if (authProvider.isAdmin) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -105,6 +139,39 @@ class _LoginScreenState extends State<LoginScreen>
       }
     } else {
       _showError(authProvider.error ?? 'Erreur Google');
+    }
+  }
+
+  // 🔥 MOT DE PASSE OUBLIÉ - VÉRIFICATION VIA FIRESTORE
+    // 🔥 MOT DE PASSE OUBLIÉ - UNIQUEMENT VIA FIREBASE AUTH
+  Future<void> _resetPassword() async {
+    if (_emailController.text.isEmpty || !_emailController.text.contains('@')) {
+      _showError('Veuillez entrer un email valide');
+      return;
+    }
+
+    final email = _emailController.text.trim();
+
+    try {
+      // Envoi direct sans vérification préalable
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      _showSuccess('Email de réinitialisation envoyé ! Vérifiez votre boîte de réception (et les spams).');
+      
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'Format d\'email invalide';
+          break;
+        case 'too-many-requests':
+          message = 'Trop de tentatives. Réessayez dans quelques minutes.';
+          break;
+        default:
+          message = 'Erreur: ${e.message}';
+      }
+      _showError(message);
+    } catch (e) {
+      _showError('Erreur réseau. Vérifiez votre connexion internet.');
     }
   }
 
@@ -145,7 +212,6 @@ class _LoginScreenState extends State<LoginScreen>
                 children: [
                   const SizedBox(height: 60),
                   
-                  // Logo animé
                   AnimatedBuilder(
                     animation: _pulseAnimation,
                     builder: (context, child) {
@@ -336,7 +402,7 @@ class _LoginScreenState extends State<LoginScreen>
                   
                   const SizedBox(height: 12),
                   
-                  // ✅ AJOUTÉ : Case "Se souvenir de moi"
+                  // Case "Se souvenir de moi"
                   Row(
                     children: [
                       SizedBox(
@@ -404,11 +470,11 @@ class _LoginScreenState extends State<LoginScreen>
                   
                   const SizedBox(height: 12),
                   
-                  // 🔻 DÉPLACÉ : Mot de passe oublié sous le bouton
+                  // Mot de passe oublié
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () => _resetPassword(),
+                      onPressed: _resetPassword,
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,
                         minimumSize: const Size(0, 0),
@@ -474,19 +540,19 @@ class _LoginScreenState extends State<LoginScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.network(
-                          'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png',
-                          height: 24,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            );
-                          },
-                        ),
+                            'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png',
+                            height: 24,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              );
+                            },
+                          ),
                           const SizedBox(width: 12),
                           const Text(
                             'Continuer avec Google',
@@ -546,24 +612,5 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       ),
     );
-  }
-
-  Future<void> _resetPassword() async {
-    if (_emailController.text.isEmpty) {
-      _showError('Veuillez entrer votre email d\'abord');
-      return;
-    }
-
-    final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-
-    final success = await authProvider.resetPassword(
-      _emailController.text.trim(),
-    );
-
-    if (success) {
-      _showSuccess('Email de réinitialisation envoyé !');
-    } else {
-      _showError(authProvider.error ?? 'Erreur');
-    }
   }
 }

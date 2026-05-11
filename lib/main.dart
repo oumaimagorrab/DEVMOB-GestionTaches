@@ -15,12 +15,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/auth_provider.dart';
 import 'providers/project_provider.dart'; // <- ajouté
 import 'providers/task_provider.dart'; // <- ajouté
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+    await FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
   runApp(const MyApp());
 }
 

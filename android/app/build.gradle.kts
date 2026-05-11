@@ -47,4 +47,5 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.2.0")) // ou dernière version
     implementation ("com.google.firebase:firebase-auth")
     implementation ("com.google.android.gms:play-services-auth:20.6.0") // pour Google Sign-In
+    implementation 'com.google.firebase:firebase-appcheck-playintegrity:16.1.2'
 }
