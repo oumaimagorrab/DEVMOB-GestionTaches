@@ -729,11 +729,14 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: onMorePressed,
-            child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
-          ),
+          // 🔥 CONDITION : 3 points visibles uniquement pour les admins
+          if (_isCurrentUserAdmin) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onMorePressed,
+              child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
+            ),
+          ],
         ],
       ),
     );
@@ -790,11 +793,14 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onMorePressed,
-                child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
-              ),
+              // 🔥 CONDITION : 3 points visibles uniquement pour les admins
+              if (_isCurrentUserAdmin) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: onMorePressed,
+                  child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),

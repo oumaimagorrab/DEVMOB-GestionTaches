@@ -12,35 +12,9 @@ class CollaboratorProjectsPage extends StatefulWidget {
   State<CollaboratorProjectsPage> createState() => _CollaboratorProjectsPageState();
 }
 
-class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage>
-    with SingleTickerProviderStateMixin {  // ← AJOUTÉ : pour l'animation
+class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   int _currentIndex = 0;
-
-  // ← AJOUTÉ : Contrôleur d'animation pour le logo
-  late AnimationController _logoController;
-  late Animation<double> _pulseAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    // ← AJOUTÉ : Initialisation de l'animation
-    _logoController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    // ← AJOUTÉ : Nettoyage du contrôleur
-    _logoController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,89 +33,7 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        // ← MODIFIÉ : Logo animé remplaçant le container simple
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) {
-              return Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF5B5BD6).withOpacity(
-                        0.2 + (_pulseAnimation.value * 0.1),
-                      ),
-                      blurRadius: 10 + (_pulseAnimation.value * 5),
-                      spreadRadius: 1 + (_pulseAnimation.value * 2),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF5B5BD6), Color(0xFF7C3AED)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF5B5BD6).withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.folder_outlined,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -2,
-                      right: -2,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Colors.amber, Colors.orange],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.amber.withOpacity(0.4),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.bolt,
-                          color: Colors.white,
-                          size: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
+        automaticallyImplyLeading: false, // ← SUPPRESSION DE LA FLÈCHE DE RETOUR
         title: const Text(
           'Mes Projets',
           style: TextStyle(
