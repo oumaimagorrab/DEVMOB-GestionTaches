@@ -16,7 +16,6 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _selectedIndex = 0;
 
-  // Variables pour les statistiques dynamiques
   int _activeProjects = 0;
   int _completedTasks = 0;
   int _lateTasks = 0;
@@ -24,8 +23,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _recentMembers = [];
   String? _currentUserId;
-  
-  // Variables pour le nom et le rôle
+
   String _displayName = "Utilisateur";
   bool _isAdmin = false;
 
@@ -33,11 +31,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void initState() {
     super.initState();
     _currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    _loadUserData();  // Charger d'abord les infos utilisateur
+    _loadUserData();
     _loadDashboardData();
   }
 
-  // Charger les infos de l'utilisateur connecté
   Future<void> _loadUserData() async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -51,14 +48,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (userDoc.exists) {
         final userData = userDoc.data()!;
         setState(() {
-          // Vérifier si c'est un admin
           _isAdmin = userData['role'] == 'admin' || userData['isAdmin'] == true;
-          
-          // Définir le nom à afficher
+
           if (_isAdmin) {
             _displayName = "Admin";
           } else {
-            // Pour les collaborateurs, utiliser le nom stocké dans Firestore
             _displayName = userData['name'] ?? 
                           userData['displayName'] ?? 
                           currentUser.displayName ?? 
@@ -66,7 +60,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           }
         });
       } else {
-        // Si pas de document Firestore, utiliser Firebase Auth
         setState(() {
           _displayName = currentUser.displayName ?? "Utilisateur";
         });
@@ -79,63 +72,90 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
   }
 
-  // Chargement des données depuis Firestore
+  // 🔥 CHARGEMENT DES DONNÉES — CORRECTION DATE
   Future<void> _loadDashboardData() async {
     try {
       setState(() => _isLoading = true);
 
       final firestore = FirebaseFirestore.instance;
       final now = DateTime.now();
-      final weekAgo = now.subtract(const Duration(days: 7));
 
-      // 1. Compter les projets actifs
+      // ✅ CORRIGÉ : Date d'aujourd'hui à minuit (00:00:00) pour comparer proprement
+      final today = DateTime(now.year, now.month, now.day);
+      final weekAgo = today.subtract(const Duration(days: 7));
+
+      print('📅 Aujourd\'hui (minuit): $today');
+
+      // 1. Projets actifs
       final projectsSnapshot = await firestore
           .collection('projects')
-          .where('status', isEqualTo: 'active')
+          .where('status', whereIn: ['active', 'en_cours'])
           .get();
 
-      // 2. Compter les tâches terminées cette semaine
+      // 2. Tâches terminées cette semaine
+      final doneTasksSnapshot = await firestore
+          .collection('tasks')
+          .where('status', isEqualTo: 'done')
+          .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo))
+          .get();
+
       final completedTasksSnapshot = await firestore
           .collection('tasks')
           .where('status', isEqualTo: 'completed')
-          .where('completedAt', isGreaterThanOrEqualTo: weekAgo)
+          .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo))
           .get();
 
-      // 3. Compter les tâches en retard
+      // 3. ✅ CORRIGÉ : Tâches en retard — dueDate < aujourd'hui (minuit)
       final lateTasksSnapshot = await firestore
           .collection('tasks')
-          .where('dueDate', isLessThan: now)
-          .where('status', whereIn: ['pending', 'in_progress'])
+          .where('dueDate', isLessThan: Timestamp.fromDate(today))
+          .where('status', whereIn: ['todo', 'in_progress', 'pending'])
           .get();
 
-      // 4. Compter les membres actifs (collaborateurs uniquement)
-      final membersSnapshot = await firestore
-          .collection('users')
-          .where('role', isEqualTo: 'collaborateur')
-          .get();
+      // 4. Membres actifs
+      final membersSnapshot = await firestore.collection('users').get();
 
-      // 5. Récupérer les membres récents pour les avatars
+      final activeMembers = membersSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final role = data['role'] as String?;
+        final isAdmin = data['isAdmin'] as bool? ?? false;
+        return role != 'admin' && !isAdmin;
+      }).toList();
+
+      // 5. Membres récents (sans photoURL)
       final recentMembersSnapshot = await firestore
           .collection('users')
-          .where('role', isEqualTo: 'collaborateur')
           .orderBy('createdAt', descending: true)
-          .limit(3)
+          .limit(5)
           .get();
 
-      final recentMembers = recentMembersSnapshot.docs.map((doc) => {
+      final recentMembers = recentMembersSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final role = data['role'] as String?;
+        final isAdmin = data['isAdmin'] as bool? ?? false;
+        return role != 'admin' && !isAdmin;
+      }).map((doc) => {
         'id': doc.id,
         'name': doc.data()['displayName'] ?? doc.data()['name'] ?? 'Utilisateur',
-        'photoURL': doc.data()['photoURL'] ?? doc.data()['avatarUrl'],
+        // 🚫 photoURL supprimé — plus d'avatars
       }).toList();
 
       setState(() {
         _activeProjects = projectsSnapshot.docs.length;
-        _completedTasks = completedTasksSnapshot.docs.length;
+        _completedTasks = doneTasksSnapshot.docs.length + completedTasksSnapshot.docs.length;
         _lateTasks = lateTasksSnapshot.docs.length;
-        _activeMembers = membersSnapshot.docs.length;
-        _recentMembers = recentMembers;
+        _activeMembers = activeMembers.length;
+        _recentMembers = recentMembers.take(3).toList();
         _isLoading = false;
       });
+
+      // Debug
+      print('📊 Stats: $_activeProjects projets, $_completedTasks tâches finies, $_lateTasks retard, $_activeMembers membres');
+      for (var doc in lateTasksSnapshot.docs) {
+        final d = doc.data() as Map<String, dynamic>;
+        final due = (d['dueDate'] as Timestamp?)?.toDate();
+        print('🚨 Tâche en retard: ${d['title']} | dueDate: $due');
+      }
 
     } catch (e) {
       print('Erreur chargement dashboard: $e');
@@ -186,7 +206,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await _loadUserData();  // Recharger aussi les infos user
+                  await _loadUserData();
                   await _loadDashboardData();
                 },
                 child: SingleChildScrollView(
@@ -196,7 +216,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     children: [
                       const SizedBox(height: 8),
 
-                      // Salutation dynamique selon le rôle
                       Text(
                         'Bonjour $_displayName !',
                         style: const TextStyle(
@@ -272,8 +291,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   iconBgColor: Colors.orange.withOpacity(0.1),
                                   value: _activeMembers.toString(),
                                   label: 'Membres actifs',
-                                  showAvatars: _recentMembers.isNotEmpty,
-                                  members: _recentMembers,
+                                  // 🚫 showAvatars supprimé
                                 ),
                               ],
                             ),
@@ -363,8 +381,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     bool showProgressBar = false,
     Color? progressColor,
     bool showBadge = false,
-    bool showAvatars = false,
-    List<Map<String, dynamic>>? members,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -470,58 +486,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            ),
-          ],
-
-          if (showAvatars && members != null && members.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 24,
-              child: Stack(
-                children: [
-                  for (int i = 0; i < members.length && i < 3; i++)
-                    Positioned(
-                      left: i * 16,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          color: Colors.grey.shade300,
-                        ),
-                        child: members[i]['photoURL'] != null
-                            ? ClipOval(
-                                child: Image.network(
-                                  members[i]['photoURL'],
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                    Center(
-                                      child: Text(
-                                        members[i]['name'][0].toUpperCase(),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  members[i]['name'][0].toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                ],
               ),
             ),
           ],

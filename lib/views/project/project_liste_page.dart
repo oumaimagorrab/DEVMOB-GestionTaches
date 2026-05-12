@@ -225,32 +225,43 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                             color: Colors.grey.shade500,
                                                           ),
                                                         )
-                                                      : SizedBox(
-                                                          width: 32 + (members.length - 1) * 20.0,
-                                                          height: 32,
-                                                          child: Stack(
-                                                            children: [
-                                                              for (int i = 0; i < members.length && i < 3; i++)
-                                                                Positioned(
-                                                                  left: i * 20,
-                                                                  child: Container(
-                                                                    width: 32,
-                                                                    height: 32,
-                                                                    decoration: BoxDecoration(
-                                                                      shape: BoxShape.circle,
-                                                                      border: Border.all(color: Colors.white, width: 2),
-                                                                      image: DecorationImage(
-                                                                        image: NetworkImage(
-                                                                          // members contient des IDs ou URLs, adapter selon votre logique
-                                                                          'https://i.pravatar.cc/150?img=${members[i].hashCode % 70}',
-                                                                        ),
-                                                                        fit: BoxFit.cover,
-                                                                      ),
+                                                      : Row(
+                                                          children: [
+                                                            for (int i = 0; i < members.length && i < 3; i++)
+                                                              Container(
+                                                                margin: const EdgeInsets.only(right: 4),
+                                                                width: 28,
+                                                                height: 28,
+                                                                decoration: BoxDecoration(
+                                                                  color: _parseColor(project.color)?.withOpacity(0.15) ?? const Color(0xFF6B4EFF).withOpacity(0.15),
+                                                                  shape: BoxShape.circle,
+                                                                ),
+                                                                child: Icon(
+                                                                  Icons.person_outline,
+                                                                  size: 16,
+                                                                  color: _parseColor(project.color) ?? const Color(0xFF6B4EFF),
+                                                                ),
+                                                              ),
+                                                            if (members.length > 3)
+                                                              Container(
+                                                                width: 28,
+                                                                height: 28,
+                                                                decoration: BoxDecoration(
+                                                                  color: Colors.grey.shade200,
+                                                                  shape: BoxShape.circle,
+                                                                ),
+                                                                child: Center(
+                                                                  child: Text(
+                                                                    '+${members.length - 3}',
+                                                                    style: TextStyle(
+                                                                      fontSize: 11,
+                                                                      color: Colors.grey.shade600,
+                                                                      fontWeight: FontWeight.w600,
                                                                     ),
                                                                   ),
                                                                 ),
-                                                            ],
-                                                          ),
+                                                              ),
+                                                          ],
                                                         ),
                                                   
                                                   Row(

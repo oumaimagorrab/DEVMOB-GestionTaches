@@ -21,7 +21,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   late String _currentStatus;
   late TaskModel _task;
   String? _assigneeName;
-  String _assigneeImage = 'https://i.pravatar.cc/150?img=11';
   final TextEditingController _commentController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -57,7 +56,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           final data = doc.data() as Map<String, dynamic>;
           setState(() {
             _assigneeName = data['name'] ?? data['displayName'] ?? 'Collaborateur';
-            _assigneeImage = data['photoURL'] ?? data['avatar'] ?? 'https://i.pravatar.cc/150?img=11';
           });
         } else {
           setState(() {
@@ -79,7 +77,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
     const currentUserId = 'user123';
     const currentUserName = 'Moi';
-    const currentUserAvatar = 'https://i.pravatar.cc/150?img=12';
 
     try {
       await _firestore
@@ -90,7 +87,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         'text': text,
         'authorId': currentUserId,
         'authorName': currentUserName,
-        'authorAvatar': currentUserAvatar,
         'createdAt': Timestamp.now(),
         'mentions': _extractMentions(text),
       });
@@ -146,6 +142,16 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
+  // 🔥 VÉRIFIER SI LA TÂCHE EST EN RETARD (dueDate < aujourd'hui)
+  bool get _isLate {
+    if (_task.dueDate == null) return false;
+    final now = DateTime.now();
+    // Comparer seulement les dates (pas l'heure)
+    final today = DateTime(now.year, now.month, now.day);
+    final due = DateTime(_task.dueDate!.year, _task.dueDate!.month, _task.dueDate!.day);
+    return due.isBefore(today);
+  }
+
   void _changeStatus() {
     showModalBottomSheet(
       context: context,
@@ -185,7 +191,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       : status['color'] == 'indigo'
                           ? const Color(0xFF6B4EFF)
                           : Colors.grey.shade600;
-                  
+
                   return ListTile(
                     leading: Container(
                       width: 12,
@@ -310,9 +316,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Status Chip (cliquable)
               GestureDetector(
                 onTap: _changeStatus,
@@ -351,9 +357,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Title dynamique
               Text(
                 _task.title ,
@@ -363,9 +369,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   color: Colors.black87,
                 ),
               ),
-              
+
               const SizedBox(height: 12),
-              
+
               // Description dynamique
               Text(
                 _task.description ?? 'Aucune description',
@@ -375,10 +381,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   height: 1.5,
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
-              // Info Cards - CORRIGÉ pour matcher l'image exacte
+
+              // Info Cards
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -394,7 +400,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 ),
                 child: Column(
                   children: [
-                    // Assigned to - LAYOUT CORRIGÉ
+                    // Assigned to
                     Row(
                       children: [
                         Icon(Icons.person_outline, size: 20, color: Colors.grey[400]),
@@ -410,9 +416,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundImage: NetworkImage(_assigneeImage),
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.grey.shade200,
+                              ),
+                              child: Icon(Icons.person, size: 14, color: Colors.grey.shade400),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -440,10 +451,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         ),
                       ],
                     ),
-                    
+
                     const Divider(height: 24),
-                    
-                    // Due date - LAYOUT CORRIGÉ
+
+                    // Due date — ✅ CORRIGÉ : badge "En retard" conditionnel
                     Row(
                       children: [
                         Icon(Icons.calendar_today_outlined, size: 20, color: Colors.grey[400]),
@@ -466,7 +477,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            if (_currentStatus != 'done') ...[
+                            // ✅ AFFICHER "En retard" UNIQUEMENT SI VRAIMENT EN RETARD
+                            if (_isLate && _currentStatus != 'done') ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -491,10 +503,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         ),
                       ],
                     ),
-                    
+
                     const Divider(height: 24),
-                    
-                    // Priority - LAYOUT CORRIGÉ
+
+                    // Priority
                     Row(
                       children: [
                         Icon(Icons.flag_outlined, size: 20, color: Colors.grey[400]),
@@ -527,10 +539,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         ),
                       ],
                     ),
-                    
+
                     const Divider(height: 24),
-                    
-                    // Created date - LAYOUT CORRIGÉ
+
+                    // Created date
                     Row(
                       children: [
                         Icon(Icons.access_time, size: 20, color: Colors.grey[400]),
@@ -555,10 +567,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 28),
-              
-              // Comments Section - DYNAMIQUE
+
+              // Comments Section
               StreamBuilder<QuerySnapshot>(
                 stream: _firestore
                     .collection('tasks')
@@ -607,7 +619,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             child: _buildComment(
                               name: data['authorName'] ?? 'Anonyme',
                               time: timeAgo,
-                              avatarUrl: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=5',
                               comment: data['text'] ?? '',
                               highlightName: true,
                             ),
@@ -622,7 +633,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           ),
         ),
       ),
-      
+
       // Bottom Comment Input
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(12),
@@ -639,11 +650,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         child: SafeArea(
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage(
-                  'https://i.pravatar.cc/150?img=12',
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade200,
                 ),
+                child: Icon(Icons.person, size: 16, color: Colors.grey.shade400),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -723,16 +737,20 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   Widget _buildComment({
     required String name,
     required String time,
-    required String avatarUrl,
     required String comment,
     bool highlightName = false,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundImage: NetworkImage(avatarUrl),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.grey.shade200,
+          ),
+          child: Icon(Icons.person, size: 18, color: Colors.grey.shade400),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -780,11 +798,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     if (!highlightMentions) {
       return [TextSpan(text: text)];
     }
-    
+
     final List<TextSpan> spans = [];
     final parts = text.split(RegExp(r'(@\w+)'));
     final matches = RegExp(r'@\w+').allMatches(text).map((m) => m.group(0)).toList();
-    
+
     int matchIndex = 0;
     for (int i = 0; i < parts.length; i++) {
       if (parts[i].isNotEmpty) {
@@ -801,7 +819,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         matchIndex++;
       }
     }
-    
+
     return spans;
   }
 }
