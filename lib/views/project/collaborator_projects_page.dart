@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/project.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
+import 'package:gestiontaches/views/project/project_detail_page2.dart';
 
 class CollaboratorProjectsPage extends StatefulWidget {
   const CollaboratorProjectsPage({super.key});
@@ -192,10 +193,11 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          Navigator.pushNamed(
+          Navigator.push(
             context,
-            '/collaborator/project/detail',
-            arguments: project,
+            MaterialPageRoute(
+              builder: (context) => ProjectDetailPage2(project: project),
+            ),
           );
         },
         child: Column(

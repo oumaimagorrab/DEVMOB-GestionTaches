@@ -13,7 +13,7 @@ class TeamMembersPage extends StatefulWidget {
 }
 
 class _TeamMembersPageState extends State<TeamMembersPage> {
-  int _selectedIndex = 1; // Équipe est sélectionnée par défaut
+  int _selectedIndex = 1; // Valeur par défaut (collaborateur)
   bool _isLoading = true;
   String? _currentUserId;
   bool _isCurrentUserAdmin = false;
@@ -26,11 +26,10 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
   void initState() {
     super.initState();
     _currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    _checkUserRole();
-    _loadTeamMembers();
+    _checkUserRole().then((_) => _loadTeamMembers());
   }
 
-  // 🔥 VÉRIFIER LE RÔLE DE L'UTILISATEUR
+  // 🔥 VÉRIFIER LE RÔLE ET AJUSTER L'INDEX DE NAVIGATION
   Future<void> _checkUserRole() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -43,8 +42,12 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
 
       if (doc.exists) {
         final data = doc.data()!;
+        final bool isAdmin = data['role'] == 'admin' || data['isAdmin'] == true;
         setState(() {
-          _isCurrentUserAdmin = data['role'] == 'admin' || data['isAdmin'] == true;
+          _isCurrentUserAdmin = isAdmin;
+          // ✅ Admin = index 2 (Équipe dans menu 4 items)
+          // ✅ Collaborateur = index 1 (Équipe dans menu 3 items)
+          _selectedIndex = isAdmin ? 2 : 1;
         });
       }
     } catch (e) {
@@ -55,7 +58,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
   // 🔥 RÉCUPÉRATION DYNAMIQUE DES MEMBRES DEPUIS FIRESTORE
   Future<void> _loadTeamMembers() async {
     setState(() => _isLoading = true);
-    
+
     try {
       FirebaseFirestore.instance
           .collection('users')
@@ -70,7 +73,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
             'id': doc.id,
             'name': data['name'] ?? 'Sans nom',
             'email': data['email'] ?? 'Sans email',
-            'image': data['imageUrl'] ?? data['photoURL'] ?? 'https://i.pravatar.cc/150?img=0',
             'role': data['role'] ?? 'Membre',
             'isAdmin': data['role'] == 'admin' || data['isAdmin'] == true,
           };
@@ -97,8 +99,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       setState(() => _isLoading = false);
     }
   }
-
-  // ... (toutes les méthodes existantes: _promoteMember, _demoteMember, etc.) ...
 
   Future<void> _promoteMember(String memberId) async {
     if (!_isCurrentUserAdmin) {
@@ -170,7 +170,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         'isAdmin': false,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
-        'imageUrl': 'https://i.pravatar.cc/150?img=${DateTime.now().millisecond}',
       });
       _showSuccess('Invitation envoyée à $email');
     } catch (e) {
@@ -206,7 +205,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 if (_isCurrentUserAdmin && !isCurrentUser) ...[
                   ListTile(
                     leading: Container(
@@ -409,7 +408,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       )),
                       const SizedBox(height: 24),
                     ],
-                    
+
                     Row(
                       children: [
                         const Text(
@@ -438,9 +437,9 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 12),
-                    
+
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -477,14 +476,14 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                                   if (index < collaborators.length - 1)
                                     Divider(
                                       height: 1,
-                                      indent: 76,
+                                      indent: 56,
                                       endIndent: 16,
                                       color: Colors.grey.shade200,
                                     ),
                                 ],
                               );
                             }),
-                          
+
                           if (_isCurrentUserAdmin)
                             Padding(
                               padding: const EdgeInsets.all(16),
@@ -515,16 +514,13 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 100),
                   ],
                 ),
               ),
             ),
-      
-      // 🎯 NAVIGATION ADAPTATIVE SELON LE RÔLE
-      // Admin: FAB + BottomNav custom (4 items)
-      // Collaborateur: BottomNavigationBar standard (3 items) comme CollaboratorProjectsPage
+
       floatingActionButton: _isCurrentUserAdmin
           ? GestureDetector(
               onTap: () => Navigator.pushNamed(context, '/createprojects'),
@@ -553,9 +549,9 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       floatingActionButtonLocation: _isCurrentUserAdmin
           ? FloatingActionButtonLocation.centerDocked
           : null,
-      
+
       bottomNavigationBar: _isCurrentUserAdmin
-          // 🎯 MENU ADMIN (4 items + FAB)
+          // 🎯 MENU ADMIN (4 items + FAB) : 0=Accueil, 1=Projets, 2=Équipe, 3=Profil
           ? Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -583,7 +579,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                 ),
               ),
             )
-          // 🎯 MENU COLLABORATEUR (3 items) - Identique à CollaboratorProjectsPage
+          // 🎯 MENU COLLABORATEUR (3 items) : 0=Projets, 1=Équipe, 2=Profil
           : BottomNavigationBar(
               currentIndex: _selectedIndex,
               onTap: (index) {
@@ -632,7 +628,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
   // 🎯 NAV ITEM POUR ADMIN (custom)
   Widget _buildAdminNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() => _selectedIndex = index);
@@ -689,7 +685,15 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       ),
       child: Row(
         children: [
-          _buildAvatar(member['image']),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade200,
+            ),
+            child: Icon(Icons.person, color: Colors.grey.shade400),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -729,7 +733,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               ),
             ),
           ),
-          // 🔥 CONDITION : 3 points visibles uniquement pour les admins
           if (_isCurrentUserAdmin) ...[
             const SizedBox(width: 8),
             GestureDetector(
@@ -753,7 +756,15 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         children: [
           Row(
             children: [
-              _buildAvatar(member['image']),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade200,
+                ),
+                child: Icon(Icons.person, color: Colors.grey.shade400),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -793,7 +804,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   ),
                 ),
               ),
-              // 🔥 CONDITION : 3 points visibles uniquement pour les admins
               if (_isCurrentUserAdmin) ...[
                 const SizedBox(width: 8),
                 GestureDetector(
@@ -825,24 +835,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAvatar(String imageUrl) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.grey.shade200,
-        image: DecorationImage(
-          image: NetworkImage(imageUrl),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: imageUrl.isEmpty || imageUrl == 'https://i.pravatar.cc/150?img=0'
-          ? Icon(Icons.person, color: Colors.grey.shade400)
-          : null,
     );
   }
 
