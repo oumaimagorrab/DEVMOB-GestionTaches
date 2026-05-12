@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:gestiontaches/models/task.dart';
 import 'package:provider/provider.dart';
 import 'package:gestiontaches/providers/task_provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Ajoutez ceci
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class CreateTaskPage extends StatefulWidget {
@@ -21,10 +21,10 @@ class CreateTaskPage extends StatefulWidget {
 class _CreateTaskPageState extends State<CreateTaskPage> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  
+
   DateTime? _selectedDate;
   String _selectedPriority = 'Medium';
-  String? _selectedAssigneeId; // Changé de String à String?
+  String? _selectedAssigneeId;
   bool _notifyOnComplete = false;
   bool _isSaving = false;
 
@@ -37,8 +37,8 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
   @override
   void initState() {
     super.initState();
-    _loadMembers(); // Charger les membres au démarrage
-    
+    _loadMembers();
+
     _titleController.addListener(() => setState(() {}));
     _descriptionController.addListener(() => setState(() {}));
   }
@@ -50,7 +50,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
     super.dispose();
   }
 
-    // ✅ MÉTHODE POUR CHARGER LES MEMBRES DEPUIS FIRESTORE (sans admin)
+  // ✅ CHARGER LES MEMBRES DEPUIS FIRESTORE (sans admin)
   Future<void> _loadMembers() async {
     try {
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
@@ -66,7 +66,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
         return {
           'id': doc.id,
           'name': data['displayName'] ?? data['name'] ?? 'Utilisateur',
-          'image': data['photoURL'] ?? data['avatar'] ?? 'https://i.pravatar.cc/150?img=${doc.hashCode % 70}',
+          'image': data['photoURL'] ?? data['avatar'] ?? '',
           'email': data['email'] ?? '',
           'role': data['role'] ?? 'collaborateur',
         };
@@ -87,13 +87,6 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
     } catch (e) {
       print('❌ Erreur chargement membres: $e');
       setState(() => _isLoadingMembers = false);
-      
-      // Fallback sans admin
-      _members = [
-        {'id': 'user1', 'name': 'Bob Durand', 'image': 'https://i.pravatar.cc/150?img=2', 'email': '', 'role': 'collaborateur'},
-        {'id': 'user2', 'name': 'Alice Martin', 'image': 'https://i.pravatar.cc/150?img=1', 'email': '', 'role': 'collaborateur'},
-      ];
-      _selectedAssigneeId = 'user1';
     }
   }
 
@@ -120,7 +113,7 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
         );
       },
     );
-    
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -128,75 +121,106 @@ class _CreateTaskPageState extends State<CreateTaskPage> {
     }
   }
 
-Future<void> _saveTask() async {
-  if (_titleController.text.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Veuillez entrer un nom de tâche')),
-    );
-    return;
+  // 🔥 ENVOYER UNE NOTIFICATION AU COLLABORATEUR
+  Future<void> _sendNotification({
+    required String assigneeId,
+    required String taskTitle,
+    required String taskId,
+  }) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final adminName = currentUser?.displayName ?? 'Un administrateur';
+
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': assigneeId,
+        'type': 'task_assigned',
+        'title': '$adminName vous a assigné une tâche',
+        'message': taskTitle,
+        'taskId': taskId,
+        'projectId': widget.projectId,
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      print('✅ Notification envoyée à $assigneeId');
+    } catch (e) {
+      print('❌ Erreur envoi notification: $e');
+    }
   }
 
-  // ✅ AJOUTÉ: Vérifier si des membres sont disponibles
-  if (_selectedAssigneeId == null || _members.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Aucun membre disponible pour assignation')),
-    );
-    return;
-  }
-
-  setState(() => _isSaving = true);
-
-  // ✅ CORRIGÉ: Gestion sécurisée de firstWhere
-  final assigneeData = _members.firstWhere(
-    (m) => m['id'] == _selectedAssigneeId,
-    orElse: () => _members.isNotEmpty ? _members.first : <String, dynamic>{},
-  );
-
-  // ✅ Vérifier si assigneeData est valide
-  if (assigneeData.isEmpty) {
-    setState(() => _isSaving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Erreur: membre non trouvé')),
-    );
-    return;
-  }
-
-  final taskProvider = context.read<TaskProvider>();
-
-  print('🚀 Saving task dans projectId: ${widget.projectId}');
-  print('👤 Assigné à: ${assigneeData['name']} (ID: $_selectedAssigneeId)');
-  
-  final task = await taskProvider.createTask(
-    projectId: widget.projectId,
-    title: _titleController.text,
-    description: _descriptionController.text,
-    priority: _selectedPriority.toLowerCase(),
-    createdBy: 'currentUserId',
-    assigneeId: _selectedAssigneeId,
-    dueDate: _selectedDate,
-  );
-
-  setState(() => _isSaving = false);
-
-  if (task != null) {
-    if (_notifyOnComplete) {
+  Future<void> _saveTask() async {
+    if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vous serez notifié lorsque la tâche sera terminée'),
-          backgroundColor: Color(0xFF6B4EFF),
+        const SnackBar(content: Text('Veuillez entrer un nom de tâche')),
+      );
+      return;
+    }
+
+    if (_selectedAssigneeId == null || _members.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucun membre disponible pour assignation')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    final assigneeData = _members.firstWhere(
+      (m) => m['id'] == _selectedAssigneeId,
+      orElse: () => _members.isNotEmpty ? _members.first : <String, dynamic>{},
+    );
+
+    if (assigneeData.isEmpty) {
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erreur: membre non trouvé')),
+      );
+      return;
+    }
+
+    final taskProvider = context.read<TaskProvider>();
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    print('🚀 Saving task dans projectId: ${widget.projectId}');
+    print('👤 Assigné à: ${assigneeData['name']} (ID: $_selectedAssigneeId)');
+
+    final task = await taskProvider.createTask(
+      projectId: widget.projectId,
+      title: _titleController.text,
+      description: _descriptionController.text,
+      priority: _selectedPriority.toLowerCase(),
+      createdBy: currentUser?.uid ?? 'currentUserId',
+      assigneeId: _selectedAssigneeId,
+      dueDate: _selectedDate,
+    );
+
+    setState(() => _isSaving = false);
+
+    if (task != null) {
+      // ✅ ENVOYER LA NOTIFICATION AU COLLABORATEUR
+      await _sendNotification(
+        assigneeId: _selectedAssigneeId!,
+        taskTitle: _titleController.text,
+        taskId: task.id,
+      );
+
+      if (_notifyOnComplete) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vous serez notifié lorsque la tâche sera terminée'),
+            backgroundColor: Color(0xFF6B4EFF),
+          ),
+        );
+      }
+      Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(taskProvider.error ?? 'Erreur lors de la création'),
+          backgroundColor: Colors.red,
         ),
       );
     }
-    Navigator.pop(context, true);
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(taskProvider.error ?? 'Erreur lors de la création'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
 
   Color _getPriorityColor(String priority) {
     switch (priority) {
@@ -298,7 +322,7 @@ Future<void> _saveTask() async {
 
                   const SizedBox(height: 8),
 
-                  // ✅ Dropdown avec membres Firestore
+                  // ✅ Dropdown avec membres Firestore (sans avatar image)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
@@ -321,11 +345,9 @@ Future<void> _saveTask() async {
                                   height: 32,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    image: DecorationImage(
-                                      image: NetworkImage(member['image']),
-                                      fit: BoxFit.cover,
-                                    ),
+                                    color: Colors.grey.shade200,
                                   ),
+                                  child: Icon(Icons.person, size: 16, color: Colors.grey.shade400),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

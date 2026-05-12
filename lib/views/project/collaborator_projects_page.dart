@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/project.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
 import 'package:gestiontaches/views/project/project_detail_page2.dart';
+import 'package:gestiontaches/views/notifications/notifications_page.dart'; // ✅ AJOUTÉ
 
 class CollaboratorProjectsPage extends StatefulWidget {
   const CollaboratorProjectsPage({super.key});
@@ -34,7 +35,7 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false, // ← SUPPRESSION DE LA FLÈCHE DE RETOUR
+        automaticallyImplyLeading: false,
         title: const Text(
           'Mes Projets',
           style: TextStyle(
@@ -50,27 +51,56 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
               IconButton(
                 icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
                 onPressed: () {
-                  // Navigation vers les notifications
+                  // ✅ NAVIGATION VERS LA PAGE NOTIFICATIONS
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsPage(),
+                    ),
+                  );
                 },
               ),
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+              // 🔥 BADGE ROUGE : compte les notifs non lues
+              StreamBuilder<QuerySnapshot>(
+                stream: _firestore
+                    .collection('notifications')
+                    .where('userId', isEqualTo: userId)
+                    .where('read', isEqualTo: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+                  if (count == 0) return const SizedBox.shrink();
+
+                  return Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: count > 9 ? 18 : 14,
+                      height: 14,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // ✅ Récupère les projets où le collaborateur est membre
         stream: _firestore
             .collection('projects')
             .where('members', arrayContains: userId)
@@ -144,7 +174,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
           setState(() {
             _currentIndex = index;
           });
-          // Navigation vers les autres pages selon l'index
           if (index == 1) {
             Navigator.pushNamed(context, '/team');
           } else if (index == 2) {
@@ -178,9 +207,7 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
   }
 
   Widget _buildProjectCard(ProjectModel project) {
-    // Couleur de la barre de progression selon le statut
     final Color progressColor = _getProgressColor(project.status);
-    // Pourcentage de progression (à adapter selon votre modèle)
     final double progress = project.progress ?? 0.0;
 
     return Card(
@@ -202,7 +229,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
         },
         child: Column(
           children: [
-            // Bordure colorée en haut
             Container(
               height: 4,
               decoration: BoxDecoration(
@@ -217,7 +243,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Titre et menu
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -239,7 +264,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Description
                   Text(
                     project.description ?? 'Aucune description',
                     style: TextStyle(
@@ -251,13 +275,10 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
-                  // Avatars et date
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Avatars des membres (stackés)
                       _buildMemberAvatars(project.members),
-                      // Date
                       Row(
                         children: [
                           Icon(
@@ -278,7 +299,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Barre de progression
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
@@ -289,7 +309,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Pourcentage
                   Text(
                     '${progress.toInt()}% complété',
                     style: TextStyle(
@@ -310,7 +329,7 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
   Color _getProgressColor(String status) {
     switch (status) {
       case 'en_cours':
-        return const Color(0xFF5B5BD6); // Violet
+        return const Color(0xFF5B5BD6);
       case 'termine':
         return Colors.green;
       case 'en_attente':
@@ -325,7 +344,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
       return const SizedBox.shrink();
     }
 
-    // Limite à 3 avatars + compteur
     final displayMembers = members.take(3).toList();
     const double avatarSize = 32;
     const double overlap = 12;
@@ -336,7 +354,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
       child: Stack(
         children: displayMembers.asMap().entries.map((entry) {
           final index = entry.key;
-          final memberId = entry.value;
           return Positioned(
             left: index * overlap,
             child: Container(
@@ -346,12 +363,8 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                 color: Colors.grey.shade300,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
-                image: const DecorationImage(
-                  // TODO: Charger l'image du membre depuis Firestore
-                  image: NetworkImage('https://i.pravatar.cc/150?img=${1}'),
-                  fit: BoxFit.cover,
-                ),
               ),
+              child: Icon(Icons.person, size: 16, color: Colors.grey.shade500),
             ),
           );
         }).toList(),
