@@ -1,16 +1,20 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gestiontaches/models/task.dart';
 
 class TaskDetailPage extends StatefulWidget {
   final TaskModel task;
   final String projectTitle;
+  final List<String> projectMembers;
 
   const TaskDetailPage({
     super.key,
     required this.task,
     required this.projectTitle,
+    this.projectMembers = const [],
   });
 
   @override
@@ -21,8 +25,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   late String _currentStatus;
   late TaskModel _task;
   String? _assigneeName;
+  String? _assigneePhotoURL;
   final TextEditingController _commentController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final Map<String, Map<String, dynamic>> _usersCache = {};
 
   final List<Map<String, String>> statusOptions = [
     {'value': 'todo', 'label': 'À faire', 'color': 'grey'},
@@ -38,7 +45,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     if (_task.isCompleted) {
       _currentStatus = 'done';
     }
-    _loadAssignee();
+    _loadAllUsers();
   }
 
   @override
@@ -47,36 +54,213 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     super.dispose();
   }
 
-  // Charger les infos du collaborateur assigné
-  Future<void> _loadAssignee() async {
+  Future<void> _loadAllUsers() async {
+    final Set<String> userIds = {};
+
     if (_task.assigneeId != null && _task.assigneeId!.isNotEmpty) {
+      userIds.add(_task.assigneeId!);
+    }
+
+    for (final memberId in widget.projectMembers) {
+      userIds.add(memberId);
+    }
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      userIds.add(currentUser.uid);
+    }
+
+    for (final userId in userIds) {
+      if (_usersCache.containsKey(userId)) continue;
+
       try {
-        final doc = await _firestore.collection('users').doc(_task.assigneeId).get();
+        final doc = await _firestore.collection('users').doc(userId).get();
         if (doc.exists) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data()!;
           setState(() {
-            _assigneeName = data['name'] ?? data['displayName'] ?? 'Collaborateur';
+            _usersCache[userId] = {
+              'name': data['name'] ?? data['displayName'] ?? 'Utilisateur',
+              'photoURL': data['photoURL'] ?? '',
+              'email': data['email'] ?? '',
+            };
           });
-        } else {
-          setState(() {
-            _assigneeName = _task.assigneeId;
-          });
+
+          if (userId == _task.assigneeId) {
+            setState(() {
+              _assigneeName = _usersCache[userId]!['name'];
+              _assigneePhotoURL = _usersCache[userId]!['photoURL'];
+            });
+          }
         }
       } catch (e) {
-        setState(() {
-          _assigneeName = _task.assigneeId;
-        });
+        print('❌ Erreur chargement utilisateur $userId: $e');
       }
     }
   }
 
-  // Envoyer un commentaire
+  Widget _buildAvatar(String? userId, {double size = 36}) {
+    final user = userId != null ? _usersCache[userId] : null;
+    final photoURL = user?['photoURL'] as String? ?? '';
+
+    final bool hasPhoto = photoURL.isNotEmpty && File(photoURL).existsSync();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey.shade200,
+      ),
+      child: hasPhoto
+          ? ClipOval(
+              child: Image.file(
+                File(photoURL),
+                fit: BoxFit.cover,
+                width: size,
+                height: size,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400);
+                },
+              ),
+            )
+          : Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400),
+    );
+  }
+
+  String _getUserName(String? userId) {
+    if (userId == null) return 'Inconnu';
+    return _usersCache[userId]?['name'] as String? ?? 'Utilisateur';
+  }
+
+  Future<void> _changeAssignee() async {
+    final membersToShow = widget.projectMembers.isNotEmpty
+        ? widget.projectMembers
+        : [_task.assigneeId ?? ''].where((id) => id.isNotEmpty).toList();
+
+    for (final memberId in membersToShow) {
+      if (!_usersCache.containsKey(memberId)) {
+        try {
+          final doc = await _firestore.collection('users').doc(memberId).get();
+          if (doc.exists) {
+            final data = doc.data()!;
+            setState(() {
+              _usersCache[memberId] = {
+                'name': data['name'] ?? data['displayName'] ?? 'Utilisateur',
+                'photoURL': data['photoURL'] ?? '',
+                'email': data['email'] ?? '',
+              };
+            });
+          }
+        } catch (e) {
+          print('❌ Erreur chargement membre $memberId: $e');
+        }
+      }
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Assigner à',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...membersToShow.map((memberId) {
+                  final member = _usersCache[memberId];
+                  final bool isSelected = memberId == _task.assigneeId;
+
+                  return ListTile(
+                    leading: _buildAvatar(memberId, size: 40),
+                    title: Text(
+                      member?['name'] ?? 'Utilisateur',
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: Text(
+                      member?['email'] ?? '',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check, color: Color(0xFF6B4EFF))
+                        : null,
+                    onTap: () async {
+                      try {
+                        await _firestore.collection('tasks').doc(_task.id).update({
+                          'assigneeId': memberId,
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        });
+
+                        setState(() {
+                          _task = _task.copyWith(assigneeId: memberId);
+                          _assigneeName = _getUserName(memberId);
+                          _assigneePhotoURL = _usersCache[memberId]?['photoURL'] as String?;
+                        });
+
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Assigné à ${_getUserName(memberId)}'),
+                            backgroundColor: const Color(0xFF10B981),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      } catch (e) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erreur: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendComment() async {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
 
-    const currentUserId = 'user123';
-    const currentUserName = 'Moi';
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final currentUserId = currentUser?.uid ?? 'anonymous';
+    final currentUserName = _getUserName(currentUserId);
 
     try {
       await _firestore
@@ -100,7 +284,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
-  // Extraire les mentions @username
   List<String> _extractMentions(String text) {
     final matches = RegExp(r'@(\w+)').allMatches(text);
     return matches.map((m) => m.group(1)!).toList();
@@ -142,11 +325,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
-  // 🔥 VÉRIFIER SI LA TÂCHE EST EN RETARD (dueDate < aujourd'hui)
   bool get _isLate {
     if (_task.dueDate == null) return false;
     final now = DateTime.now();
-    // Comparer seulement les dates (pas l'heure)
     final today = DateTime(now.year, now.month, now.day);
     final due = DateTime(_task.dueDate!.year, _task.dueDate!.month, _task.dueDate!.day);
     return due.isBefore(today);
@@ -186,7 +367,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 const SizedBox(height: 16),
                 ...statusOptions.map((status) {
                   final isSelected = _currentStatus == status['value'];
-                  final color = status['color'] == 'green' 
+                  final color = status['color'] == 'green'
                       ? const Color(0xFF10B981)
                       : status['color'] == 'indigo'
                           ? const Color(0xFF6B4EFF)
@@ -208,16 +389,16 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         color: isSelected ? color : Colors.black87,
                       ),
                     ),
-                    trailing: isSelected 
+                    trailing: isSelected
                         ? Icon(Icons.check, color: color)
                         : null,
                     onTap: () {
                       setState(() {
                         _currentStatus = status['value']!;
-                      _task = _task.copyWith(
-                        status: _currentStatus,
-                        isCompleted: _currentStatus == 'done',
-                      );
+                        _task = _task.copyWith(
+                          status: _currentStatus,
+                          isCompleted: _currentStatus == 'done',
+                        );
                       });
                       Navigator.pop(context);
                     },
@@ -250,12 +431,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.black54),
-            onPressed: () {
-              // TODO: Modifier la tâche
-            },
-          ),
+          // ❌ Icône de modification supprimée
+          // Gardé seulement la suppression
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.black54),
             onPressed: () {
@@ -289,7 +466,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Projet parent
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -319,7 +495,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
               const SizedBox(height: 16),
 
-              // Status Chip (cliquable)
               GestureDetector(
                 onTap: _changeStatus,
                 child: Container(
@@ -360,9 +535,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
               const SizedBox(height: 16),
 
-              // Title dynamique
               Text(
-                _task.title ,
+                _task.title,
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -372,7 +546,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
               const SizedBox(height: 12),
 
-              // Description dynamique
               Text(
                 _task.description ?? 'Aucune description',
                 style: TextStyle(
@@ -384,7 +557,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
               const SizedBox(height: 24),
 
-              // Info Cards
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -400,7 +572,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 ),
                 child: Column(
                   children: [
-                    // Assigned to
                     Row(
                       children: [
                         Icon(Icons.person_outline, size: 20, color: Colors.grey[400]),
@@ -416,15 +587,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.grey.shade200,
-                              ),
-                              child: Icon(Icons.person, size: 14, color: Colors.grey.shade400),
-                            ),
+                            _buildAvatar(_task.assigneeId, size: 28),
                             const SizedBox(width: 8),
                             Text(
                               _assigneeName ?? 'Chargement...',
@@ -435,14 +598,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () {
-                                // TODO: Ouvrir sélecteur de membre
-                              },
+                              onTap: _changeAssignee,
                               child: Text(
                                 'Modifier',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.indigo[400],
+                                  color: const Color(0xFF6B4EFF),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -454,7 +615,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
                     const Divider(height: 24),
 
-                    // Due date — ✅ CORRIGÉ : badge "En retard" conditionnel
                     Row(
                       children: [
                         Icon(Icons.calendar_today_outlined, size: 20, color: Colors.grey[400]),
@@ -477,7 +637,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            // ✅ AFFICHER "En retard" UNIQUEMENT SI VRAIMENT EN RETARD
                             if (_isLate && _currentStatus != 'done') ...[
                               const SizedBox(width: 8),
                               Container(
@@ -506,7 +665,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
                     const Divider(height: 24),
 
-                    // Priority
                     Row(
                       children: [
                         Icon(Icons.flag_outlined, size: 20, color: Colors.grey[400]),
@@ -542,7 +700,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
                     const Divider(height: 24),
 
-                    // Created date
                     Row(
                       children: [
                         Icon(Icons.access_time, size: 20, color: Colors.grey[400]),
@@ -570,7 +727,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
               const SizedBox(height: 28),
 
-              // Comments Section
               StreamBuilder<QuerySnapshot>(
                 stream: _firestore
                     .collection('tasks')
@@ -609,18 +765,33 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       else
                         ...comments.map((doc) {
                           final data = doc.data() as Map<String, dynamic>;
+                          final authorId = data['authorId'] as String? ?? '';
                           final createdAt = data['createdAt'] as Timestamp?;
                           final timeAgo = createdAt != null
                               ? _formatTimeAgo(createdAt.toDate())
                               : 'maintenant';
 
+                          if (authorId.isNotEmpty && !_usersCache.containsKey(authorId)) {
+                            _firestore.collection('users').doc(authorId).get().then((userDoc) {
+                              if (userDoc.exists && mounted) {
+                                final userData = userDoc.data()!;
+                                setState(() {
+                                  _usersCache[authorId] = {
+                                    'name': userData['name'] ?? userData['displayName'] ?? 'Anonyme',
+                                    'photoURL': userData['photoURL'] ?? '',
+                                    'email': userData['email'] ?? '',
+                                  };
+                                });
+                              }
+                            });
+                          }
+
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 16),
                             child: _buildComment(
-                              name: data['authorName'] ?? 'Anonyme',
+                              authorId: authorId,
                               time: timeAgo,
                               comment: data['text'] ?? '',
-                              highlightName: true,
                             ),
                           );
                         }).toList(),
@@ -634,7 +805,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         ),
       ),
 
-      // Bottom Comment Input
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -650,15 +820,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         child: SafeArea(
           child: Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
-                ),
-                child: Icon(Icons.person, size: 16, color: Colors.grey.shade400),
-              ),
+              _buildAvatar(FirebaseAuth.instance.currentUser?.uid, size: 32),
               const SizedBox(width: 12),
               Expanded(
                 child: Container(
@@ -705,7 +867,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.indigo[600],
+                    color: const Color(0xFF6B4EFF),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -722,7 +884,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  // Formater le temps écoulé
   String _formatTimeAgo(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -735,23 +896,16 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   }
 
   Widget _buildComment({
-    required String name,
+    required String authorId,
     required String time,
     required String comment,
-    bool highlightName = false,
   }) {
+    final authorName = _getUserName(authorId);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey.shade200,
-          ),
-          child: Icon(Icons.person, size: 18, color: Colors.grey.shade400),
-        ),
+        _buildAvatar(authorId, size: 36),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -760,7 +914,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               Row(
                 children: [
                   Text(
-                    name,
+                    authorName,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -784,7 +938,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     color: Colors.grey[700],
                     height: 1.4,
                   ),
-                  children: _buildCommentText(comment, highlightName),
+                  children: _buildCommentText(comment),
                 ),
               ),
             ],
@@ -794,11 +948,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
-  List<TextSpan> _buildCommentText(String text, bool highlightMentions) {
-    if (!highlightMentions) {
-      return [TextSpan(text: text)];
-    }
-
+  List<TextSpan> _buildCommentText(String text) {
     final List<TextSpan> spans = [];
     final parts = text.split(RegExp(r'(@\w+)'));
     final matches = RegExp(r'@\w+').allMatches(text).map((m) => m.group(0)).toList();
