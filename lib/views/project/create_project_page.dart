@@ -1,6 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:gestiontaches/models/user.dart'; 
 import 'package:gestiontaches/providers/project_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,25 +17,23 @@ class CreateProjectPage extends StatefulWidget {
 class _CreateProjectPageState extends State<CreateProjectPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
 
   DateTime? _selectedDate;
   int _selectedColorIndex = 0;
   int _descriptionLength = 0;
-  bool _isInviting = false;
   bool _isLoadingMembers = true;
 
-  final List<Color> projectColors = [
-    const Color(0xFF5B5BD6),
-    const Color(0xFFA855F7),
-    const Color(0xFF10B981),
-    const Color(0xFFF59E0B),
-    const Color(0xFFEF4444),
-    const Color(0xFF3B82F6),
+  // 🎨 Couleurs avec leurs valeurs hex correctes
+  final List<Map<String, dynamic>> projectColors = [
+    {'color': const Color(0xFF5B5BD6), 'hex': 'FF5B5BD6'}, // Indigo
+    {'color': const Color(0xFFA855F7), 'hex': 'FFA855F7'}, // Violet
+    {'color': const Color(0xFF10B981), 'hex': 'FF10B981'}, // Emerald
+    {'color': const Color(0xFFF59E0B), 'hex': 'FFF59E0B'}, // Amber
+    {'color': const Color(0xFFEF4444), 'hex': 'FFEF4444'}, // Red
+    {'color': const Color(0xFF3B82F6), 'hex': 'FF3B82F6'}, // Blue
   ];
 
   List<Map<String, dynamic>> _members = [];
-  String? _selectedMemberId;
   List<Map<String, dynamic>> invitedMembers = [];
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _usersSubscription;
@@ -57,7 +55,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     _usersSubscription?.cancel();
     _nameController.dispose();
     _descriptionController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
@@ -112,7 +109,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         return {
           'id': doc.id,
           'name': data['displayName'] ?? data['name'] ?? 'Utilisateur',
-          'image': data['photoURL'] ?? data['avatar'] ?? 'https://i.pravatar.cc/150?img=${doc.hashCode % 70}',
+          'photoURL': data['photoURL'] ?? '', // 🖼️ Photo locale
           'email': data['email'] ?? '',
           'role': data['role'] ?? 'collaborateur',
         };
@@ -136,45 +133,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
       print('❌ Erreur stream membres: $e');
       if (mounted) setState(() => _isLoadingMembers = false);
     });
-  }
-
-  Future<Map<String, dynamic>?> _findUserByEmail(String email) async {
-    try {
-      final existingUser = _members.cast<Map<String, dynamic>?>().firstWhere(
-        (m) => m != null && (m['email'] as String).toLowerCase() == email.toLowerCase(),
-        orElse: () => null,
-      );
-
-      if (existingUser != null) return existingUser;
-
-      final QuerySnapshot result = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: email.toLowerCase())
-          .limit(1)
-          .get();
-
-      if (result.docs.isNotEmpty) {
-        final doc = result.docs.first;
-        final data = doc.data() as Map<String, dynamic>;
-
-        final role = data['role'] ?? 'collaborateur';
-        if (role == 'admin') {
-          return null;
-        }
-
-        return {
-          'id': doc.id,
-          'name': data['displayName'] ?? data['name'] ?? email.split('@')[0],
-          'image': data['photoURL'] ?? data['avatar'] ?? 'https://i.pravatar.cc/150?img=${email.hashCode % 70}',
-          'email': email,
-          'role': role,
-        };
-      }
-      return null;
-    } catch (e) {
-      print('❌ Erreur recherche utilisateur: $e');
-      return null;
-    }
   }
 
   Future<void> _selectDate() async {
@@ -202,64 +160,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     }
   }
 
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
-  }
-
-  Future<void> _inviteMember() async {
-    final email = _emailController.text.trim().toLowerCase();
-
-    if (email.isEmpty) {
-      _showSnackBar('Veuillez entrer un email');
-      return;
-    }
-
-    if (!_isValidEmail(email)) {
-      _showSnackBar('Format d\'email invalide');
-      return;
-    }
-
-    if (invitedMembers.any((m) => m['email'] == email)) {
-      _showSnackBar('Cet utilisateur est déjà invité');
-      return;
-    }
-
-    setState(() => _isInviting = true);
-
-    final user = await _findUserByEmail(email);
-    bool isNewUser = user == null;
-
-    Map<String, dynamic> userToInvite;
-    if (user != null) {
-      if (user['role'] == 'admin') {
-        setState(() => _isInviting = false);
-        _showSnackBar('Impossible d\'ajouter un administrateur comme membre');
-        return;
-      }
-      userToInvite = user;
-    } else {
-      userToInvite = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'name': email.split('@')[0],
-        'email': email,
-        'image': 'https://i.pravatar.cc/150?img=${email.hashCode % 70}',
-        'role': 'collaborateur',
-      };
-    }
-
-    setState(() {
-      invitedMembers.add(userToInvite);
-      _emailController.clear();
-      _isInviting = false;
-    });
-
-    if (isNewUser) {
-      _showSnackBar('Invitation envoyée à $email', isSuccess: true);
-    } else {
-      _showSnackBar('${userToInvite['name']} a été ajouté au projet', isSuccess: true);
-    }
-  }
-
   void _showSnackBar(String message, {bool isSuccess = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -273,7 +173,36 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     );
   }
 
-  // ✅ MODIFIÉ: Ajout du paramètre status
+  /// 🖼️ Widget avatar avec photo de profil locale (même logique que TeamMembersPage)
+  Widget _buildMemberAvatar(String? photoURL, {double size = 56}) {
+    final bool hasPhoto = photoURL != null && 
+                          photoURL.isNotEmpty && 
+                          File(photoURL).existsSync();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey.shade200,
+      ),
+      child: hasPhoto
+          ? ClipOval(
+              child: Image.file(
+                File(photoURL),
+                fit: BoxFit.cover,
+                width: size,
+                height: size,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400);
+                },
+              ),
+            )
+          : Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400),
+    );
+  }
+
+  // ✅ CORRIGÉ: Utilise le hex pré-défini au lieu de .value.toRadixString(16)
   Future<void> _createProject() async {
     if (_nameController.text.trim().isEmpty) {
       _showSnackBar('Veuillez entrer un nom de projet');
@@ -292,7 +221,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         .map((m) => m['id'] as String)
         .toList();
 
-    // ✅ AJOUTÉ: Paramètre status='active'
+    // ✅ FIX: Utilise la valeur hex correcte du Map
+    final selectedColorHex = projectColors[_selectedColorIndex]['hex'] as String;
+
     final project = await provider.createProject(
       title: _nameController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
@@ -300,8 +231,8 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
           : _descriptionController.text.trim(),
       createdBy: currentUserId,
       members: memberIds,
-      color: projectColors[_selectedColorIndex].value.toRadixString(16),
-      status: 'active',  // ✅ AJOUTÉ: Le nouveau projet est actif par défaut
+      color: selectedColorHex,  // ✅ Hex correct : "FF5B5BD6" etc.
+      status: 'active',
     );
 
     if (project != null) {
@@ -491,9 +422,11 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
 
                   const SizedBox(height: 12),
 
+                  // 🎨 Sélecteur de couleur corrigé
                   Row(
                     children: List.generate(projectColors.length, (index) {
                       final isSelected = _selectedColorIndex == index;
+                      final color = projectColors[index]['color'] as Color;
                       return GestureDetector(
                         onTap: () {
                           setState(() {
@@ -505,7 +438,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: projectColors[index],
+                            color: color,
                             shape: BoxShape.circle,
                             border: isSelected
                                 ? Border.all(color: Colors.white, width: 3)
@@ -513,7 +446,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                             boxShadow: [
                               if (isSelected)
                                 BoxShadow(
-                                  color: projectColors[index].withOpacity(0.4),
+                                  color: color.withOpacity(0.4),
                                   blurRadius: 8,
                                   spreadRadius: 2,
                                 ),
@@ -544,6 +477,7 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
 
                   const SizedBox(height: 16),
 
+                  // 🖼️ Membres invités avec photos locales
                   if (invitedMembers.isNotEmpty) ...[
                     SizedBox(
                       height: 80,
@@ -558,38 +492,11 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                               children: [
                                 Stack(
                                   children: [
-                                    Container(
-                                      width: 56,
-                                      height: 56,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: const Color(0xFF6B4EFF),
-                                          width: 2,
-                                        ),
-                                        image: DecorationImage(
-                                          image: NetworkImage(user['image'] ?? 'https://i.pravatar.cc/150?img=0'),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
+                                    // 🖼️ Avatar avec photo locale
+                                    _buildMemberAvatar(
+                                      user['photoURL'] as String?,
+                                      size: 56,
                                     ),
-                                    if (!(user['isActive'] ?? true))
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.orange,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.mail_outline,
-                                            size: 12,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
                                     Positioned(
                                       right: -4,
                                       top: -4,
@@ -632,73 +539,11 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                     const SizedBox(height: 16),
                   ],
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            hintText: 'Ajouter par email',
-                            hintStyle: TextStyle(color: Colors.grey.shade500),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF5B5BD6), width: 1),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: _isInviting ? null : _inviteMember,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6B4EFF),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _isInviting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                'Inviter',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
+                  // ❌ SUPPRIMÉ: Champ "Ajouter par email" + bouton Inviter
 
                   const SizedBox(height: 24),
 
+                  // 🖼️ Membres récents avec photos locales
                   if (_members.isNotEmpty) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -738,8 +583,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
                             _showSnackBar('${member['name']} ajouté', isSuccess: true);
                           },
                           child: Chip(
-                            avatar: CircleAvatar(
-                              backgroundImage: NetworkImage(member['image']),
+                            avatar: _buildMemberAvatar(
+                              member['photoURL'] as String?,
+                              size: 28,
                             ),
                             label: Text(member['name']),
                             backgroundColor: Colors.grey.shade100,

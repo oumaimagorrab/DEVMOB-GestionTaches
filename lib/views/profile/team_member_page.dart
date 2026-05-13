@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -60,6 +61,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
             'email': data['email'] ?? 'Sans email',
             'role': data['role'] ?? 'Membre',
             'isAdmin': data['role'] == 'admin' || data['isAdmin'] == true,
+            'photoURL': data['photoURL'] ?? '',
           };
           if (doc.id == _currentUserId) _isCurrentUserAdmin = member['isAdmin'];
           if (member['isAdmin']) admins.add(member); else collabs.add(member);
@@ -396,7 +398,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                                 ],
                               );
                             }),
-                          // 🔥 MODIFIE : Redirection directe vers CreateAccountPage
                           if (_isCurrentUserAdmin)
                             Padding(
                               padding: const EdgeInsets.all(16),
@@ -542,6 +543,33 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
     );
   }
 
+  // 🖼️ WIDGET AVATAR AVEC PHOTO DE PROFIL
+  Widget _buildAvatar(String? photoURL, {double size = 48}) {
+    final bool hasPhoto = photoURL != null && photoURL.isNotEmpty && File(photoURL).existsSync();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey.shade200,
+      ),
+      child: hasPhoto
+          ? ClipOval(
+              child: Image.file(
+                File(photoURL),
+                fit: BoxFit.cover,
+                width: size,
+                height: size,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400);
+                },
+              ),
+            )
+          : Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400),
+    );
+  }
+
   Widget _buildMemberCard({required Map<String, dynamic> member, required VoidCallback onMorePressed}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -549,7 +577,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
       child: Row(
         children: [
-          Container(width: 48, height: 48, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey.shade200), child: Icon(Icons.person, color: Colors.grey.shade400)),
+          _buildAvatar(member['photoURL'], size: 48),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -582,7 +610,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         children: [
           Row(
             children: [
-              Container(width: 48, height: 48, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey.shade200), child: Icon(Icons.person, color: Colors.grey.shade400)),
+              _buildAvatar(member['photoURL'], size: 48),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

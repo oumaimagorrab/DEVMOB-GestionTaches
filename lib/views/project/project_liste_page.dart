@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gestiontaches/views/project/project_detail_page.dart';
 import 'package:intl/intl.dart';
 import 'create_project_page.dart';
+import 'edit_project_page.dart'; // ← AJOUTÉ: Page d'édition
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:gestiontaches/providers/project_provider.dart';
-import 'package:gestiontaches/models/project.dart'; // Utilisation de ProjectModel
+import 'package:gestiontaches/models/project.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ProjectsPage extends StatefulWidget {
@@ -18,6 +21,9 @@ class ProjectsPage extends StatefulWidget {
 class _ProjectsPageState extends State<ProjectsPage> {
   int _selectedIndex = 1;
   
+  // Cache des photos de profil des membres : Map<userId, photoURL>
+  final Map<String, String?> _membersPhotos = {};
+
   @override
   void initState() {
     super.initState();
@@ -29,7 +35,68 @@ class _ProjectsPageState extends State<ProjectsPage> {
       }
     });
   }
-  
+
+  /// 🔄 Charge les photos de profil des membres assignés aux projets
+  Future<void> _loadMembersPhotos(List<ProjectModel> projects) async {
+    final Set<String> allMemberIds = {};
+    for (final project in projects) {
+      for (final memberId in project.members) {
+        allMemberIds.add(memberId);
+      }
+    }
+
+    for (final memberId in allMemberIds) {
+      if (_membersPhotos.containsKey(memberId)) continue;
+
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(memberId)
+            .get();
+
+        if (doc.exists) {
+          final data = doc.data();
+          setState(() {
+            _membersPhotos[memberId] = data?['photoURL'] as String?;
+          });
+        } else {
+          _membersPhotos[memberId] = null;
+        }
+      } catch (e) {
+        print('Erreur chargement photo membre $memberId: $e');
+        _membersPhotos[memberId] = null;
+      }
+    }
+  }
+
+  /// 🖼️ Widget avatar avec photo de profil
+  Widget _buildMemberAvatar(String? photoURL, {double size = 28}) {
+    final bool hasPhoto = photoURL != null && 
+                          photoURL.isNotEmpty && 
+                          File(photoURL).existsSync();
+
+    if (!hasPhoto) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      margin: const EdgeInsets.only(right: 4),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.transparent,
+      ),
+      child: ClipOval(
+        child: Image.file(
+          File(photoURL),
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +104,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
     final projectProvider = context.watch<ProjectProvider>();
     final List<ProjectModel> projects = projectProvider.projects;
 
+    if (projects.isNotEmpty && _membersPhotos.isEmpty) {
+      _loadMembersPhotos(projects);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
-            // Header modifié - SEULEMENT NOTIFICATION
+            // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
@@ -57,7 +128,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     ),
                   ),
                   
-                  // SEULEMENT LA NOTIFICATION (photo de profil supprimée)
                   Stack(
                     children: [
                       const Icon(
@@ -128,8 +198,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                               itemCount: projects.length,
                               itemBuilder: (context, index) {
                                 final project = projects[index];
-                                // members est déjà List<String> dans ProjectModel
                                 final members = project.members;
+                                final projectColor = _parseColor(project.color);
                                 
                                 return GestureDetector(
                                   onTap: () {
@@ -162,7 +232,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                         Container(
                                           height: 4,
                                           decoration: BoxDecoration(
-                                            color: _parseColor(project.color),
+                                            color: projectColor,
                                             borderRadius: const BorderRadius.only(
                                               topLeft: Radius.circular(20),
                                               topRight: Radius.circular(20),
@@ -228,20 +298,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                       : Row(
                                                           children: [
                                                             for (int i = 0; i < members.length && i < 3; i++)
-                                                              Container(
-                                                                margin: const EdgeInsets.only(right: 4),
-                                                                width: 28,
-                                                                height: 28,
-                                                                decoration: BoxDecoration(
-                                                                  color: _parseColor(project.color)?.withOpacity(0.15) ?? const Color(0xFF6B4EFF).withOpacity(0.15),
-                                                                  shape: BoxShape.circle,
-                                                                ),
-                                                                child: Icon(
-                                                                  Icons.person_outline,
-                                                                  size: 16,
-                                                                  color: _parseColor(project.color) ?? const Color(0xFF6B4EFF),
-                                                                ),
+                                                              _buildMemberAvatar(
+                                                                _membersPhotos[members[i]],
+                                                                size: 28,
                                                               ),
+                                                            
                                                             if (members.length > 3)
                                                               Container(
                                                                 width: 28,
@@ -286,7 +347,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                               
                                               const SizedBox(height: 16),
                                               
-                                              // Barre de progression (valeur par défaut car non dans ProjectModel)
+                                              // Barre de progression
                                               Container(
                                                 height: 6,
                                                 decoration: BoxDecoration(
@@ -295,10 +356,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                 ),
                                                 child: FractionallySizedBox(
                                                   alignment: Alignment.centerLeft,
-                                                  widthFactor: 0.0, // Progression par défaut à 0%
+                                                  widthFactor: 0.0,
                                                   child: Container(
                                                     decoration: BoxDecoration(
-                                                      color: _parseColor(project.color) ?? const Color(0xFF6B4EFF),
+                                                      color: projectColor ?? const Color(0xFF6B4EFF),
                                                       borderRadius: BorderRadius.circular(3),
                                                     ),
                                                   ),
@@ -308,7 +369,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                               const SizedBox(height: 10),
                                               
                                               Text(
-                                                '0% complété', // Progression par défaut
+                                                '0% complété',
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   color: Colors.grey.shade600,
@@ -399,23 +460,36 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
-  // Helper pour parser la couleur depuis String
+  // ✅ CORRIGÉ: Enlève 0x avant int.parse avec radix:16
   Color? _parseColor(String? colorString) {
     if (colorString == null || colorString.isEmpty) return null;
     try {
-      // Si c'est une couleur hex (ex: "0xFF5B5BD6" ou "#5B5BD6")
-      if (colorString.startsWith('0x')) {
-        return Color(int.parse(colorString));
-      } else if (colorString.startsWith('#')) {
-        return Color(int.parse(colorString.replaceFirst('#', '0xFF')));
+      String cleaned = colorString.trim().toUpperCase();
+      
+      if (cleaned.startsWith('0X')) {
+        cleaned = cleaned.substring(2);
+      } else if (cleaned.startsWith('#')) {
+        cleaned = cleaned.substring(1);
       }
-      // Si c'est un MaterialColor name (optionnel)
-      return const Color(0xFF6B4EFF); // Couleur par défaut
+      
+      if (cleaned.length == 6) {
+        cleaned = 'FF' + cleaned;
+      }
+      
+      if (cleaned.length != 8) {
+        print('Format couleur invalide: $colorString → cleaned=$cleaned');
+        return const Color(0xFF6B4EFF);
+      }
+      
+      final intValue = int.parse(cleaned, radix: 16);
+      return Color(intValue);
     } catch (e) {
-      return const Color(0xFF6B4EFF); // Couleur par défaut en cas d'erreur
+      print('Erreur parsing couleur "$colorString": $e');
+      return const Color(0xFF6B4EFF);
     }
   }
 
+  // ✅ MODIFIÉ: Supprimé "Partager", "Modifier" navigue vers EditProjectPage
   void _showProjectOptions(BuildContext context, ProjectModel project) {
     final projectProvider = context.read<ProjectProvider>();
     
@@ -442,16 +516,27 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                
+                // ✅ MODIFIER: Navigation vers EditProjectPage
                 ListTile(
                   leading: const Icon(Icons.edit_outlined, color: Color(0xFF6B4EFF)),
                   title: const Text('Modifier le projet'),
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    Navigator.pop(context); // Ferme le bottom sheet
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditProjectPage(project: project),
+                      ),
+                    );
+                  },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.share_outlined, color: Color(0xFF6B4EFF)),
-                  title: const Text('Partager'),
-                  onTap: () => Navigator.pop(context),
-                ),
+                
+                // ❌ SUPPRIMÉ: Option "Partager"
+                
+                const SizedBox(height: 8),
+                
+                // SUPPRIMER
                 ListTile(
                   leading: const Icon(Icons.delete_outline, color: Colors.red),
                   title: const Text('Supprimer', style: TextStyle(color: Colors.red)),
@@ -494,7 +579,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
           case 2:
             Navigator.pushNamed(context, '/team');
             break;
-          case 3: // ✅ NAVIGATION VERS PROFIL
+          case 3:
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const ProfilePage()),

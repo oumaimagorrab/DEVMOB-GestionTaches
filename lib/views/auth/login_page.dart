@@ -306,7 +306,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 8),
                   
                   const Text(
-                    'Bienvenue sur DEVMOB-GestionTaches',
+                    'Bienvenue sur TaskFlow-GestionTaches',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey,
