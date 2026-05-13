@@ -14,7 +14,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
@@ -64,7 +64,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
       await userCredential.user!.updateDisplayName(fullName);
 
       _showSuccess('Compte créé avec succès !');
-      
+
       // Redirection vers la page de connexion ou dashboard
       if (mounted) {
         Navigator.pop(context); // Retour à la page login
@@ -112,9 +112,9 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: Colors.white, // Fond blanc pour un look épuré
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F6FA),
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -139,128 +139,107 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               child: Column(
                 children: [
                   const SizedBox(height: 40),
-                  
-                  // 📦 Container blanc avec les champs
+
+                  // Champ Prénom
+                  _buildTextField(
+                    controller: _firstNameController,
+                    hintText: 'Prénom',
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer votre prénom';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Champ Nom
+                  _buildTextField(
+                    controller: _lastNameController,
+                    hintText: 'Nom',
+                    enabled: !_isLoading,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer votre nom';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Champ Email
+                  _buildTextField(
+                    controller: _emailController,
+                    hintText: 'Email',
+                    enabled: !_isLoading,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Veuillez entrer votre email';
+                      }
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        return 'Email invalide';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Champ Mot de passe
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                          spreadRadius: -5,
-                        ),
-                      ],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
-                    child: Column(
-                      children: [
-                        // Champ Prénom
-                        _buildTextField(
-                          controller: _firstNameController,
-                          hintText: 'Prénom',
-                          enabled: !_isLoading,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre prénom';
-                            }
-                            return null;
-                          },
+                    child: TextFormField(
+                      controller: _passwordController,
+                      enabled: !_isLoading,
+                      obscureText: _obscurePassword,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Veuillez entrer un mot de passe';
+                        }
+                        if (value.length < 6) {
+                          return 'Minimum 6 caractères';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Mot de passe',
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 14,
                         ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Champ Nom
-                        _buildTextField(
-                          controller: _lastNameController,
-                          hintText: 'Nom',
-                          enabled: !_isLoading,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre nom';
-                            }
-                            return null;
-                          },
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
                         ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Champ Email
-                        _buildTextField(
-                          controller: _emailController,
-                          hintText: 'Email',
-                          enabled: !_isLoading,
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre email';
-                            }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                              return 'Email invalide';
-                            }
-                            return null;
-                          },
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Champ Mot de passe
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: Colors.grey.shade400,
+                            size: 20,
                           ),
-                          child: TextFormField(
-                            controller: _passwordController,
-                            enabled: !_isLoading,
-                            obscureText: _obscurePassword,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Veuillez entrer un mot de passe';
-                              }
-                              if (value.length < 6) {
-                                return 'Minimum 6 caractères';
-                              }
-                              return null;
-                            },
-                            decoration: InputDecoration(
-                              hintText: 'Mot de passe',
-                              hintStyle: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 14,
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.grey.shade400,
-                                  size: 20,
-                                ),
-                                onPressed: _isLoading ? null : () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
+                          onPressed: _isLoading ? null : () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 40),
-                  
+
                   // Bouton Créer le compte
                   SizedBox(
                     width: double.infinity,
@@ -295,7 +274,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
                 ],
               ),

@@ -13,12 +13,11 @@ class TeamMembersPage extends StatefulWidget {
 }
 
 class _TeamMembersPageState extends State<TeamMembersPage> {
-  int _selectedIndex = 1; // Valeur par défaut (collaborateur)
+  int _selectedIndex = 1;
   bool _isLoading = true;
   String? _currentUserId;
   bool _isCurrentUserAdmin = false;
 
-  // Listes dynamiques
   List<Map<String, dynamic>> administrators = [];
   List<Map<String, dynamic>> collaborators = [];
 
@@ -29,44 +28,30 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
     _checkUserRole().then((_) => _loadTeamMembers());
   }
 
-  // 🔥 VÉRIFIER LE RÔLE ET AJUSTER L'INDEX DE NAVIGATION
   Future<void> _checkUserRole() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (doc.exists) {
         final data = doc.data()!;
         final bool isAdmin = data['role'] == 'admin' || data['isAdmin'] == true;
         setState(() {
           _isCurrentUserAdmin = isAdmin;
-          // ✅ Admin = index 2 (Équipe dans menu 4 items)
-          // ✅ Collaborateur = index 1 (Équipe dans menu 3 items)
           _selectedIndex = isAdmin ? 2 : 1;
         });
       }
     } catch (e) {
-      print('Erreur vérification rôle: $e');
+      print('Erreur verification role: $e');
     }
   }
 
-  // 🔥 RÉCUPÉRATION DYNAMIQUE DES MEMBRES DEPUIS FIRESTORE
   Future<void> _loadTeamMembers() async {
     setState(() => _isLoading = true);
-
     try {
-      FirebaseFirestore.instance
-          .collection('users')
-          .snapshots()
-          .listen((snapshot) {
+      FirebaseFirestore.instance.collection('users').snapshots().listen((snapshot) {
         final List<Map<String, dynamic>> admins = [];
         final List<Map<String, dynamic>> collabs = [];
-
         for (var doc in snapshot.docs) {
           final data = doc.data();
           final member = {
@@ -76,18 +61,9 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
             'role': data['role'] ?? 'Membre',
             'isAdmin': data['role'] == 'admin' || data['isAdmin'] == true,
           };
-
-          if (doc.id == _currentUserId) {
-            _isCurrentUserAdmin = member['isAdmin'];
-          }
-
-          if (member['isAdmin']) {
-            admins.add(member);
-          } else {
-            collabs.add(member);
-          }
+          if (doc.id == _currentUserId) _isCurrentUserAdmin = member['isAdmin'];
+          if (member['isAdmin']) admins.add(member); else collabs.add(member);
         }
-
         setState(() {
           administrators = admins;
           collaborators = collabs;
@@ -111,7 +87,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         'isAdmin': true,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      _showSuccess('Membre promu administrateur avec succès');
+      _showSuccess('Membre promu administrateur avec succes');
     } catch (e) {
       _showError('Erreur lors de la promotion: $e');
     }
@@ -119,7 +95,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
 
   Future<void> _demoteMember(String memberId) async {
     if (!_isCurrentUserAdmin) {
-      _showError('Action non autorisée');
+      _showError('Action non autorisee');
       return;
     }
     try {
@@ -128,7 +104,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         'isAdmin': false,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      _showSuccess('Administrateur rétrogradé en membre');
+      _showSuccess('Administrateur retrograde en membre');
     } catch (e) {
       _showError('Erreur: $e');
     }
@@ -136,12 +112,12 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
 
   Future<void> _removeMember(String memberId) async {
     if (!_isCurrentUserAdmin) {
-      _showError('Action non autorisée');
+      _showError('Action non autorisee');
       return;
     }
     try {
       await FirebaseFirestore.instance.collection('users').doc(memberId).delete();
-      _showSuccess('Membre retiré avec succès');
+      _showSuccess('Membre retire avec succes');
     } catch (e) {
       _showError('Erreur lors de la suppression: $e');
     }
@@ -159,7 +135,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
           .get();
 
       if (existing.docs.isNotEmpty) {
-        _showError('Cet email est déjà membre de l\'équipe');
+        _showError("Cet email est deja membre de l'equipe");
         return;
       }
 
@@ -171,7 +147,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
-      _showSuccess('Invitation envoyée à $email');
+      _showSuccess('Invitation envoyee a $email');
     } catch (e) {
       _showError('Erreur: $e');
     }
@@ -205,7 +181,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 if (_isCurrentUserAdmin && !isCurrentUser) ...[
                   ListTile(
                     leading: Container(
@@ -220,19 +195,14 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                         size: 20,
                       ),
                     ),
-                    title: Text(isAdmin ? 'Rétrograder en membre' : 'Promouvoir admin'),
+                    title: Text(isAdmin ? 'Retrograder en membre' : 'Promouvoir admin'),
                     onTap: () {
                       Navigator.pop(context);
-                      if (isAdmin) {
-                        _demoteMember(memberId);
-                      } else {
-                        _promoteMember(memberId);
-                      }
+                      if (isAdmin) _demoteMember(memberId); else _promoteMember(memberId);
                     },
                   ),
                   const SizedBox(height: 8),
                 ],
-
                 if (_isCurrentUserAdmin && !isCurrentUser)
                   ListTile(
                     leading: Container(
@@ -249,7 +219,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       _showDeleteConfirmation(memberId, member['name']);
                     },
                   ),
-
                 if (!_isCurrentUserAdmin)
                   Padding(
                     padding: const EdgeInsets.all(16),
@@ -273,7 +242,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Confirmer la suppression'),
-        content: Text('Voulez-vous vraiment retirer $memberName de l\'équipe ?'),
+        content: Text("Voulez-vous vraiment retirer $memberName de l'equipe ?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -329,12 +298,8 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Membres de l\'équipe',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          "Membres de l'equipe",
+          style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         actions: [
@@ -351,14 +316,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                 children: [
                   Icon(Icons.admin_panel_settings, color: Color(0xFF6B4EFF), size: 16),
                   SizedBox(width: 4),
-                  Text(
-                    'Admin',
-                    style: TextStyle(
-                      color: Color(0xFF6B4EFF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Text('Admin', style: TextStyle(color: Color(0xFF6B4EFF), fontSize: 12, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -375,29 +333,12 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                     if (administrators.isNotEmpty) ...[
                       Row(
                         children: [
-                          const Text(
-                            'Administrateurs',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                          ),
+                          const Text('Administrateurs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87)),
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${administrators.length}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                            child: Text('${administrators.length}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
                           ),
                         ],
                       ),
@@ -408,38 +349,18 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       )),
                       const SizedBox(height: 24),
                     ],
-
                     Row(
                       children: [
-                        const Text(
-                          'Collaborateurs',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
+                        const Text('Collaborateurs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87)),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${collaborators.length}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                          child: Text('${collaborators.length}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 12),
-
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -455,10 +376,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                                 children: [
                                   Icon(Icons.people_outline, color: Colors.grey.shade400, size: 48),
                                   const SizedBox(height: 12),
-                                  Text(
-                                    'Aucun collaborateur',
-                                    style: TextStyle(color: Colors.grey.shade500),
-                                  ),
+                                  Text('Aucun collaborateur', style: TextStyle(color: Colors.grey.shade500)),
                                 ],
                               ),
                             )
@@ -474,16 +392,11 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                                     onPromote: () => _promoteMember(member['id']),
                                   ),
                                   if (index < collaborators.length - 1)
-                                    Divider(
-                                      height: 1,
-                                      indent: 56,
-                                      endIndent: 16,
-                                      color: Colors.grey.shade200,
-                                    ),
+                                    Divider(height: 1, indent: 56, endIndent: 16, color: Colors.grey.shade200),
                                 ],
                               );
                             }),
-
+                          // 🔥 MODIFIE : Redirection directe vers CreateAccountPage
                           if (_isCurrentUserAdmin)
                             Padding(
                               padding: const EdgeInsets.all(16),
@@ -491,14 +404,16 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                                 width: double.infinity,
                                 height: 48,
                                 child: ElevatedButton.icon(
-                                  onPressed: () => _showAddMemberOptions(),
-                                  icon: const Icon(Icons.add, size: 20),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const CreateAccountPage()),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.person_add, size: 20),
                                   label: const Text(
-                                    'Ajouter un membre',  
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    'Ajouter un membre',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF6B4EFF),
@@ -514,13 +429,11 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 100),
                   ],
                 ),
               ),
             ),
-
       floatingActionButton: _isCurrentUserAdmin
           ? GestureDetector(
               onTap: () => Navigator.pushNamed(context, '/createprojects'),
@@ -546,21 +459,13 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               ),
             )
           : null,
-      floatingActionButtonLocation: _isCurrentUserAdmin
-          ? FloatingActionButtonLocation.centerDocked
-          : null,
-
+      floatingActionButtonLocation: _isCurrentUserAdmin ? FloatingActionButtonLocation.centerDocked : null,
       bottomNavigationBar: _isCurrentUserAdmin
-          // 🎯 MENU ADMIN (4 items + FAB) : 0=Accueil, 1=Projets, 2=Équipe, 3=Profil
           ? Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 20,
-                    offset: const Offset(0, -5),
-                  ),
+                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5)),
                 ],
               ),
               child: SafeArea(
@@ -572,14 +477,13 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       _buildAdminNavItem(Icons.home_outlined, 'Accueil', 0),
                       _buildAdminNavItem(Icons.folder_outlined, 'Projets', 1),
                       const SizedBox(width: 56),
-                      _buildAdminNavItem(Icons.people_outline, 'Équipe', 2),
+                      _buildAdminNavItem(Icons.people_outline, 'Equipe', 2),
                       _buildAdminNavItem(Icons.person_outline, 'Profil', 3),
                     ],
                   ),
                 ),
               ),
             )
-          // 🎯 MENU COLLABORATEUR (3 items) : 0=Projets, 1=Équipe, 2=Profil
           : BottomNavigationBar(
               currentIndex: _selectedIndex,
               onTap: (index) {
@@ -592,7 +496,6 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                     );
                     break;
                   case 1:
-                    // Déjà sur Équipe
                     break;
                   case 2:
                     Navigator.push(
@@ -608,208 +511,97 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               unselectedItemColor: Colors.grey.shade400,
               type: BottomNavigationBarType.fixed,
               items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.folder_outlined),
-                  label: 'Projets',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people_outline),
-                  label: 'Équipe',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person_outline),
-                  label: 'Profil',
-                ),
+                BottomNavigationBarItem(icon: Icon(Icons.folder_outlined), label: 'Projets'),
+                BottomNavigationBarItem(icon: Icon(Icons.people_outline), label: 'Equipe'),
+                BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profil'),
               ],
             ),
     );
   }
 
-  // 🎯 NAV ITEM POUR ADMIN (custom)
   Widget _buildAdminNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
-
     return GestureDetector(
       onTap: () {
         setState(() => _selectedIndex = index);
         switch (index) {
-          case 0:
-            Navigator.pushNamed(context, '/dashboard');
-            break;
-          case 1:
-            Navigator.pushNamed(context, '/projects');
-            break;
-          case 2:
-            break;
-          case 3:
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfilePage()),
-            );
-            break;
+          case 0: Navigator.pushNamed(context, '/dashboard'); break;
+          case 1: Navigator.pushNamed(context, '/projects'); break;
+          case 2: break;
+          case 3: Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfilePage())); break;
         }
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
-            size: 24,
-          ),
+          Icon(icon, color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400, size: 24),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 11, color: isSelected ? const Color(0xFF6B4EFF) : Colors.grey.shade400, fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal)),
         ],
       ),
     );
   }
 
-  Widget _buildMemberCard({
-    required Map<String, dynamic> member,
-    required VoidCallback onMorePressed,
-  }) {
+  Widget _buildMemberCard({required Map<String, dynamic> member, required VoidCallback onMorePressed}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.grey.shade200,
-            ),
-            child: Icon(Icons.person, color: Colors.grey.shade400),
-          ),
+          Container(width: 48, height: 48, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey.shade200), child: Icon(Icons.person, color: Colors.grey.shade400)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  member['name'],
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
+                Text(member['name'], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                 const SizedBox(height: 2),
-                Text(
-                  member['email'],
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
+                Text(member['email'], style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6B4EFF),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Admin',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
+            decoration: BoxDecoration(color: const Color(0xFF6B4EFF), borderRadius: BorderRadius.circular(20)),
+            child: const Text('Admin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
           ),
           if (_isCurrentUserAdmin) ...[
             const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onMorePressed,
-              child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
-            ),
+            GestureDetector(onTap: onMorePressed, child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20)),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildCollaboratorItem({
-    required Map<String, dynamic> member,
-    required VoidCallback onMorePressed,
-    required VoidCallback onPromote,
-  }) {
+  Widget _buildCollaboratorItem({required Map<String, dynamic> member, required VoidCallback onMorePressed, required VoidCallback onPromote}) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey.shade200,
-                ),
-                child: Icon(Icons.person, color: Colors.grey.shade400),
-              ),
+              Container(width: 48, height: 48, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey.shade200), child: Icon(Icons.person, color: Colors.grey.shade400)),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      member['name'],
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
+                    Text(member['name'], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87)),
                     const SizedBox(height: 2),
-                    Text(
-                      member['email'],
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
+                    Text(member['email'], style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Membre',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
+                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(20)),
+                child: Text('Membre', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
               ),
               if (_isCurrentUserAdmin) ...[
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: onMorePressed,
-                  child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20),
-                ),
+                GestureDetector(onTap: onMorePressed, child: Icon(Icons.more_vert, color: Colors.grey.shade400, size: 20)),
               ],
             ],
           ),
@@ -820,150 +612,10 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
               height: 40,
               child: OutlinedButton(
                 onPressed: onPromote,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF6B4EFF),
-                  side: const BorderSide(color: Color(0xFF6B4EFF)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text(
-                  'Promouvoir',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
+                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF6B4EFF), side: const BorderSide(color: Color(0xFF6B4EFF)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                child: const Text('Promouvoir', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddMemberOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Ajouter un membre',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Choisissez comment ajouter le nouveau membre',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ListTile(
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showAddMemberByEmailDialog();
-                  },
-                  leading: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6B4EFF).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.email_outlined, color: Color(0xFF6B4EFF), size: 24),
-                  ),
-                  title: const Text('Par email', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                  subtitle: Text('Envoyer une invitation par email', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                  trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey.shade200),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CreateAccountPage()),
-                    );
-                  },
-                  leading: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.person_add_outlined, color: Colors.green, size: 24),
-                  ),
-                  title: const Text('Nouveau compte', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                  subtitle: Text('Créer un compte pour le membre', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                  trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey.shade200),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAddMemberByEmailDialog() {
-    final emailController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Inviter par email'),
-        content: TextField(
-          controller: emailController,
-          decoration: InputDecoration(
-            hintText: 'Email du membre',
-            prefixIcon: const Icon(Icons.email_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6B4EFF))),
-          ),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Annuler', style: TextStyle(color: Colors.grey.shade600)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (emailController.text.isNotEmpty) {
-                Navigator.pop(context);
-                _addMemberByEmail(emailController.text.trim());
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6B4EFF),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Envoyer'),
-          ),
         ],
       ),
     );

@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:gestiontaches/views/auth/ajoutermembre_page.dart';
 import 'package:gestiontaches/views/project/create_project_page.dart';
 import 'package:gestiontaches/views/project/dashboard_page.dart';
@@ -19,6 +22,7 @@ class _ProfilePageState extends State<ProfilePage> {
   int _selectedIndex = 0;
   bool _isCurrentUserAdmin = false;
   bool _isLoadingRole = true;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -52,9 +56,280 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() => _isLoadingRole = false);
       }
     } catch (e) {
-      print('Erreur vérification rôle: $e');
+      print('Erreur verification role: $e');
       setState(() => _isLoadingRole = false);
     }
+  }
+
+  // 📸 PRENDRE UNE PHOTO AVEC LA CAMERA
+  Future<void> _takePhoto() async {
+    Navigator.pop(context);
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        await _savePhotoLocally(photo.path);
+      }
+    } catch (e) {
+      _showError('Erreur camera: $e');
+    }
+  }
+
+  // 🖼️ CHOISIR DEPUIS LA GALERIE
+  Future<void> _pickFromGallery() async {
+    Navigator.pop(context);
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _savePhotoLocally(image.path);
+      }
+    } catch (e) {
+      _showError('Erreur galerie: $e');
+    }
+  }
+
+  // 💾 SAUVEGARDER LA PHOTO LOCALEMENT ET METTRE A JOUR FIRESTORE
+  Future<void> _savePhotoLocally(String sourcePath) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Copier l'image dans le dossier local de l'app
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final String fileName = 'profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String localPath = '${appDir.path}/$fileName';
+
+      final File sourceFile = File(sourcePath);
+      await sourceFile.copy(localPath);
+
+      // Sauvegarder le chemin dans Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'photoURL': localPath,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _showSuccess('Photo mise a jour avec succes');
+    } catch (e) {
+      _showError('Erreur sauvegarde photo: $e');
+    }
+  }
+
+  // 🗑️ SUPPRIMER LA PHOTO DE PROFIL
+  Future<void> _deletePhoto() async {
+    Navigator.pop(context);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Recuperer le chemin actuel pour supprimer le fichier
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final String? currentPath = data['photoURL'] as String?;
+        if (currentPath != null && currentPath.isNotEmpty) {
+          final File file = File(currentPath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }
+      }
+
+      // Mettre a jour Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'photoURL': '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _showSuccess('Photo supprimee');
+    } catch (e) {
+      _showError('Erreur suppression: $e');
+    }
+  }
+
+  // 🎨 BOTTOM SHEET PERSONNALISE POUR LE SELECTEUR DE PHOTO
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Indicateur de drag
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Photo de profil',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choisissez une option',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Option : Prendre une photo
+                _buildPhotoOption(
+                  icon: Icons.camera_alt_rounded,
+                  iconColor: const Color(0xFF6B4EFF),
+                  iconBgColor: const Color(0xFF6B4EFF).withOpacity(0.1),
+                  title: 'Prendre une photo',
+                  subtitle: 'Utiliser la camera',
+                  onTap: _takePhoto,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Option : Choisir depuis la galerie
+                _buildPhotoOption(
+                  icon: Icons.photo_library_rounded,
+                  iconColor: Colors.green,
+                  iconBgColor: Colors.green.withOpacity(0.1),
+                  title: 'Choisir depuis la galerie',
+                  subtitle: 'Selectionner une photo existante',
+                  onTap: _pickFromGallery,
+                ),
+
+                const SizedBox(height: 12),
+
+                // Option : Supprimer la photo
+                _buildPhotoOption(
+                  icon: Icons.delete_outline,
+                  iconColor: Colors.red,
+                  iconBgColor: Colors.red.withOpacity(0.1),
+                  title: 'Supprimer la photo',
+                  subtitle: 'Retirer la photo actuelle',
+                  onTap: _deletePhoto,
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 🎨 WIDGET POUR CHAQUE OPTION DU BOTTOM SHEET
+  Widget _buildPhotoOption({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey.shade400,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
@@ -77,53 +352,87 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     const SizedBox(height: 40),
 
-                    Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: const DecorationImage(
-                              image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                              fit: BoxFit.cover,
-                            ),
-                            border: Border.all(color: Colors.white, width: 4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user?.uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        String? localImagePath;
+                        if (snapshot.hasData && snapshot.data!.exists) {
+                          final data = snapshot.data!.data() as Map<String, dynamic>?;
+                          localImagePath = data?['photoURL'] as String?;
+                        }
+
+                        final hasLocalImage = localImagePath != null && localImagePath.isNotEmpty && File(localImagePath).existsSync();
+
+                        return Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.grey.shade200,
+                                border: Border.all(color: Colors.white, width: 4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _showImagePickerOptions,
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6B4EFF),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6B4EFF).withOpacity(0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                              child: hasLocalImage
+                                  ? ClipOval(
+                                      child: Image.file(
+                                        File(localImagePath!),
+                                        fit: BoxFit.cover,
+                                        width: 100,
+                                        height: 100,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Icon(
+                                            Icons.person,
+                                            size: 50,
+                                            color: Colors.grey.shade400,
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Colors.grey.shade400,
+                                    ),
+                            ),
+                            GestureDetector(
+                              onTap: _showImagePickerOptions,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6B4EFF),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF6B4EFF).withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ],
+                          ],
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 16),
@@ -181,13 +490,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
                     _buildMenuItem(
                       icon: Icons.shield_outlined,
-                      title: 'Confidentialité',
+                      title: 'Confidentialite',
                       onTap: _navigateToPrivacy,
                     ),
 
                     _buildMenuItem(
                       icon: Icons.info_outline,
-                      title: 'À propos',
+                      title: 'A propos',
                       onTap: _navigateToAbout,
                     ),
 
@@ -200,7 +509,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         onPressed: _showLogoutConfirmation,
                         icon: const Icon(Icons.logout, size: 20, color: Colors.red),
                         label: const Text(
-                          'Se déconnecter',
+                          'Se deconnecter',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -275,7 +584,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           _buildAdminNavItem(Icons.home_outlined, 'Accueil', 0),
                           _buildAdminNavItem(Icons.folder_outlined, 'Projets', 1),
                           const SizedBox(width: 56),
-                          _buildAdminNavItem(Icons.people_outline, 'Équipe', 2),
+                          _buildAdminNavItem(Icons.people_outline, 'Equipe', 2),
                           _buildAdminNavItem(Icons.person_outline, 'Profil', 3),
                         ],
                       ),
@@ -315,7 +624,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.people_outline),
-                      label: 'Équipe',
+                      label: 'Equipe',
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.person_outline),
@@ -373,34 +682,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showImagePickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Prendre une photo'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choisir depuis la galerie'),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('Supprimer la photo', style: TextStyle(color: Colors.red)),
-              onTap: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _navigateToEditProfile() {
     Navigator.push(
       context,
@@ -439,31 +720,31 @@ class _ProfilePageState extends State<ProfilePage> {
                 _buildHelpSection(
                   icon: Icons.rocket_launch_outlined,
                   title: 'Bienvenue sur TaskFlow',
-                  content: 'TaskFlow est votre assistant de gestion de projets et d\'équipes. Organisez vos tâches, suivez l\'avancement de vos projets et collaborez efficacement avec votre équipe, tout en un seul endroit.',
+                  content: 'TaskFlow est votre assistant de gestion de projets et d\'equipes. Organisez vos taches, suivez l\'avancement de vos projets et collaborez efficacement avec votre equipe, tout en un seul endroit.',
                 ),
                 const SizedBox(height: 20),
                 _buildHelpSection(
                   icon: Icons.task_alt,
-                  title: 'Gérer vos projets',
-                  content: 'Créez des projets en appuyant sur le bouton violet "+" en bas de l\'écran. Attribuez des tâches aux membres de votre équipe, définissez des deadlines et suivez la progression en temps réel.',
+                  title: 'Gerer vos projets',
+                  content: 'Creez des projets en appuyant sur le bouton violet "+" en bas de l\'ecran. Attribuez des taches aux membres de votre equipe, definissez des deadlines et suivez la progression en temps reel.',
                 ),
                 const SizedBox(height: 20),
                 _buildHelpSection(
                   icon: Icons.people_outline,
-                  title: 'Gérer votre équipe',
-                  content: 'Accédez à l\'onglet "Équipe" pour voir tous les membres. En tant qu\'administrateur, vous pouvez inviter de nouveaux membres par email, promouvoir des collaborateurs ou gérer les rôles.',
+                  title: 'Gerer votre equipe',
+                  content: 'Accedez a l\'onglet "Equipe" pour voir tous les membres. En tant qu\'administrateur, vous pouvez inviter de nouveaux membres par email, promouvoir des collaborateurs ou gerer les roles.',
                 ),
                 const SizedBox(height: 20),
                 _buildHelpSection(
                   icon: Icons.notifications_none,
                   title: 'Notifications',
-                  content: 'Recevez des alertes lorsqu\'une tâche vous est assignée, qu\'un projet approche de sa deadline ou qu\'un membre commente votre travail.',
+                  content: 'Recevez des alertes lorsqu\'une tache vous est assignee, qu\'un projet approche de sa deadline ou qu\'un membre commente votre travail.',
                 ),
                 const SizedBox(height: 20),
                 _buildHelpSection(
                   icon: Icons.support_agent,
                   title: 'Besoin d\'aide ?',
-                  content: 'Si vous rencontrez un problème ou avez une suggestion, contactez notre équipe support à l\'adresse : support@taskflow.app',
+                  content: 'Si vous rencontrez un probleme ou avez une suggestion, contactez notre equipe support a l\'adresse : support@taskflow.app',
                 ),
                 const SizedBox(height: 40),
               ],
@@ -547,7 +828,7 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: () => Navigator.pop(context),
             ),
             title: const Text(
-              'Confidentialité',
+              'Confidentialite',
               style: TextStyle(
                 color: Colors.black87,
                 fontSize: 18,
@@ -562,33 +843,33 @@ class _ProfilePageState extends State<ProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildPrivacySection(
-                  title: 'Politique de confidentialité',
-                  content: 'Chez TaskFlow, nous prenons la protection de vos données très au sérieux. Cette politique explique comment nous collectons, utilisons et protégeons vos informations personnelles.',
+                  title: 'Politique de confidentialite',
+                  content: 'Chez TaskFlow, nous prenons la protection de vos donnees tres au serieux. Cette politique explique comment nous collectons, utilisons et protegeons vos informations personnelles.',
                 ),
                 const SizedBox(height: 20),
                 _buildPrivacySection(
-                  title: 'Données collectées',
-                  content: 'Nous collectons uniquement les données nécessaires au fonctionnement de l\'application : votre nom, adresse email, photo de profil, et les informations relatives aux projets et tâches que vous créez. Ces données sont stockées de manière sécurisée sur nos serveurs.',
+                  title: 'Donnees collectees',
+                  content: 'Nous collectons uniquement les donnees necessaires au fonctionnement de l\'application : votre nom, adresse email, photo de profil, et les informations relatives aux projets et taches que vous creez. Ces donnees sont stockees de maniere securisee sur nos serveurs.',
                 ),
                 const SizedBox(height: 20),
                 _buildPrivacySection(
-                  title: 'Utilisation des données',
-                  content: 'Vos données sont utilisées pour : vous permettre d\'accéder à votre compte, gérer vos projets et équipes, vous envoyer des notifications importantes, et améliorer nos services. Nous ne vendons jamais vos données à des tiers.',
+                  title: 'Utilisation des donnees',
+                  content: 'Vos donnees sont utilisees pour : vous permettre d\'acceder a votre compte, gerer vos projets et equipes, vous envoyer des notifications importantes, et ameliorer nos services. Nous ne vendons jamais vos donnees a des tiers.',
                 ),
                 const SizedBox(height: 20),
                 _buildPrivacySection(
-                  title: 'Sécurité',
-                  content: 'Toutes vos données sont chiffrées en transit et au repos. Nous utilisons l\'authentification Firebase et des protocoles de sécurité avancés pour garantir la protection de vos informations.',
+                  title: 'Securite',
+                  content: 'Toutes vos donnees sont chiffrees en transit et au repos. Nous utilisons l\'authentification Firebase et des protocoles de securite avances pour garantir la protection de vos informations.',
                 ),
                 const SizedBox(height: 20),
                 _buildPrivacySection(
                   title: 'Vos droits',
-                  content: 'Vous disposez d\'un droit d\'accès, de rectification et de suppression de vos données. Pour exercer ces droits ou pour toute question, contactez-nous à privacy@taskflow.app.',
+                  content: 'Vous disposez d\'un droit d\'acces, de rectification et de suppression de vos donnees. Pour exercer ces droits ou pour toute question, contactez-nous a privacy@taskflow.app.',
                 ),
                 const SizedBox(height: 20),
                 _buildPrivacySection(
-                  title: 'Dernière mise à jour',
-                  content: 'Cette politique a été mise à jour le 20 avril 2026.',
+                  title: 'Derniere mise a jour',
+                  content: 'Cette politique a ete mise a jour le 20 avril 2026.',
                 ),
                 const SizedBox(height: 40),
               ],
@@ -652,7 +933,7 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: () => Navigator.pop(context),
             ),
             title: const Text(
-              'À propos',
+              'A propos',
               style: TextStyle(
                 color: Colors.black87,
                 fontSize: 18,
@@ -756,7 +1037,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 32),
                 Text(
-                  'Développé avec ❤️ par l\'équipe TaskFlow',
+                  'Developpe avec ❤️ par l\'equipe TaskFlow',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey.shade600,
@@ -764,7 +1045,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '© 2026 TaskFlow. Tous droits réservés.',
+                  '© 2026 TaskFlow. Tous droits reserves.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade500,
@@ -782,8 +1063,8 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        title: const Text('Deconnexion'),
+        content: const Text('Etes-vous sur de vouloir vous deconnecter ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -795,7 +1076,7 @@ class _ProfilePageState extends State<ProfilePage> {
               _performLogout();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Déconnecter'),
+            child: const Text('Deconnecter'),
           ),
         ],
       ),
@@ -808,7 +1089,7 @@ class _ProfilePageState extends State<ProfilePage> {
       Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la déconnexion: ${e.toString()}')),
+        SnackBar(content: Text('Erreur lors de la deconnexion: ${e.toString()}')),
       );
     }
   }
@@ -873,6 +1154,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -944,7 +1226,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Utilisateur non connecté');
+      if (user == null) throw Exception('Utilisateur non connecte');
 
       final firstName = _firstNameController.text.trim();
       final lastName = _lastNameController.text.trim();
@@ -961,9 +1243,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       if (email != user.email) {
         await user.verifyBeforeUpdateEmail(email);
-        _showSuccess('Un email de vérification a été envoyé à $email');
+        _showSuccess('Un email de verification a ete envoye a $email');
       } else {
-        _showSuccess('Profil mis à jour avec succès');
+        _showSuccess('Profil mis a jour avec succes');
       }
 
       if (mounted) Navigator.pop(context);
@@ -972,6 +1254,239 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
 
     setState(() => _isSaving = false);
+  }
+
+  // 📸 PRENDRE UNE PHOTO DANS EDIT PROFILE
+  Future<void> _takePhotoEdit() async {
+    Navigator.pop(context);
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        await _savePhotoLocallyEdit(photo.path);
+      }
+    } catch (e) {
+      _showError('Erreur camera: $e');
+    }
+  }
+
+  // 🖼️ CHOISIR DEPUIS LA GALERIE DANS EDIT PROFILE
+  Future<void> _pickFromGalleryEdit() async {
+    Navigator.pop(context);
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _savePhotoLocallyEdit(image.path);
+      }
+    } catch (e) {
+      _showError('Erreur galerie: $e');
+    }
+  }
+
+  // 💾 SAUVEGARDER LA PHOTO DANS EDIT PROFILE
+  Future<void> _savePhotoLocallyEdit(String sourcePath) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final String fileName = 'profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String localPath = '${appDir.path}/$fileName';
+
+      final File sourceFile = File(sourcePath);
+      await sourceFile.copy(localPath);
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'photoURL': localPath,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _showSuccess('Photo mise a jour avec succes');
+    } catch (e) {
+      _showError('Erreur sauvegarde photo: $e');
+    }
+  }
+
+  // 🗑️ SUPPRIMER LA PHOTO DANS EDIT PROFILE
+  Future<void> _deletePhotoEdit() async {
+    Navigator.pop(context);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final String? currentPath = data['photoURL'] as String?;
+        if (currentPath != null && currentPath.isNotEmpty) {
+          final File file = File(currentPath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        }
+      }
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'photoURL': '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _showSuccess('Photo supprimee');
+    } catch (e) {
+      _showError('Erreur suppression: $e');
+    }
+  }
+
+  // 🎨 BOTTOM SHEET POUR EDIT PROFILE
+  void _showImagePickerOptionsEdit() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Photo de profil',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choisissez une option',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildPhotoOptionEdit(
+                  icon: Icons.camera_alt_rounded,
+                  iconColor: const Color(0xFF6B4EFF),
+                  iconBgColor: const Color(0xFF6B4EFF).withOpacity(0.1),
+                  title: 'Prendre une photo',
+                  subtitle: 'Utiliser la camera',
+                  onTap: _takePhotoEdit,
+                ),
+                const SizedBox(height: 12),
+                _buildPhotoOptionEdit(
+                  icon: Icons.photo_library_rounded,
+                  iconColor: Colors.green,
+                  iconBgColor: Colors.green.withOpacity(0.1),
+                  title: 'Choisir depuis la galerie',
+                  subtitle: 'Selectionner une photo existante',
+                  onTap: _pickFromGalleryEdit,
+                ),
+                const SizedBox(height: 12),
+                _buildPhotoOptionEdit(
+                  icon: Icons.delete_outline,
+                  iconColor: Colors.red,
+                  iconBgColor: Colors.red.withOpacity(0.1),
+                  title: 'Supprimer la photo',
+                  subtitle: 'Retirer la photo actuelle',
+                  onTap: _deletePhotoEdit,
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoOptionEdit({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey.shade400,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showError(String message) {
@@ -1052,48 +1567,85 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: const DecorationImage(
-                              image: NetworkImage('https://i.pravatar.cc/150?img=11'),
-                              fit: BoxFit.cover,
-                            ),
-                            border: Border.all(color: Colors.white, width: 4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
+                    StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(_userId)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        String? localImagePath;
+                        if (snapshot.hasData && snapshot.data!.exists) {
+                          final data = snapshot.data!.data() as Map<String, dynamic>?;
+                          localImagePath = data?['photoURL'] as String?;
+                        }
+
+                        final hasLocalImage = localImagePath != null && localImagePath.isNotEmpty && File(localImagePath).existsSync();
+
+                        return Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.grey.shade200,
+                                border: Border.all(color: Colors.white, width: 4),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6B4EFF),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
-                      ],
+                              child: hasLocalImage
+                                  ? ClipOval(
+                                      child: Image.file(
+                                        File(localImagePath!),
+                                        fit: BoxFit.cover,
+                                        width: 100,
+                                        height: 100,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Icon(
+                                            Icons.person,
+                                            size: 50,
+                                            color: Colors.grey.shade400,
+                                          );
+                                        },
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: Colors.grey.shade400,
+                                    ),
+                            ),
+                            GestureDetector(
+                              onTap: _showImagePickerOptionsEdit,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6B4EFF),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 32),
                     _buildTextField(
                       controller: _firstNameController,
-                      label: 'Prénom',
+                      label: 'Prenom',
                       icon: Icons.person_outline,
                       validator: (v) => v == null || v.isEmpty ? 'Champ requis' : null,
                     ),
@@ -1208,7 +1760,7 @@ class PrivacyPage extends StatelessWidget {
   const PrivacyPage({super.key});
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Confidentialité')),
-        body: const Center(child: Text('Page de confidentialité')),
+        appBar: AppBar(title: const Text('Confidentialite')),
+        body: const Center(child: Text('Page de confidentialite')),
       );
 }
