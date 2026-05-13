@@ -850,12 +850,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         size: 20,
                         color: Colors.grey[400],
                       ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.attach_file,
-                        size: 20,
-                        color: Colors.grey[400],
-                      ),
                     ],
                   ),
                 ),
