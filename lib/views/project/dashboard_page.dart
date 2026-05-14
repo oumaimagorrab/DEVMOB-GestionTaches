@@ -92,18 +92,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           .where('status', whereIn: ['active', 'en_cours'])
           .get();
 
-        // 2. Tâches terminées cette semaine — utilise le flag `isCompleted` + `completedAt`
-        final doneTasksSnapshot = await firestore
+      // 2. Tâches terminées cette semaine
+      final doneTasksSnapshot = await firestore
           .collection('tasks')
-          .where('isCompleted', isEqualTo: true)
+          .where('status', isEqualTo: 'done')
           .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo))
           .get();
 
-        // 3. ✅ CORRIGÉ : Tâches en retard — dueDate < aujourd'hui (minuit) ET non complétées
-        final lateTasksSnapshot = await firestore
+      final completedTasksSnapshot = await firestore
+          .collection('tasks')
+          .where('status', isEqualTo: 'completed')
+          .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo))
+          .get();
+
+      // 3. ✅ CORRIGÉ : Tâches en retard — dueDate < aujourd'hui (minuit)
+      final lateTasksSnapshot = await firestore
           .collection('tasks')
           .where('dueDate', isLessThan: Timestamp.fromDate(today))
-          .where('isCompleted', isEqualTo: false)
+          .where('status', whereIn: ['todo', 'in_progress', 'pending'])
           .get();
 
       // 4. Membres actifs
@@ -136,7 +142,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       setState(() {
         _activeProjects = projectsSnapshot.docs.length;
-        _completedTasks = doneTasksSnapshot.docs.length;
+        _completedTasks = doneTasksSnapshot.docs.length + completedTasksSnapshot.docs.length;
         _lateTasks = lateTasksSnapshot.docs.length;
         _activeMembers = activeMembers.length;
         _recentMembers = recentMembers.take(3).toList();
