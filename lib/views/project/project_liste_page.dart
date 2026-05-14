@@ -2,9 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gestiontaches/views/project/project_detail_page.dart';
+import 'package:gestiontaches/services/task_service.dart';
 import 'package:intl/intl.dart';
 import 'create_project_page.dart';
-import 'edit_project_page.dart'; // ← AJOUTÉ: Page d'édition
+import 'edit_project_page.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:gestiontaches/providers/project_provider.dart';
@@ -20,9 +21,11 @@ class ProjectsPage extends StatefulWidget {
 
 class _ProjectsPageState extends State<ProjectsPage> {
   int _selectedIndex = 1;
-  
+
   // Cache des photos de profil des membres : Map<userId, photoURL>
   final Map<String, String?> _membersPhotos = {};
+  // Cache de progression par projectId : valeur entre 0.0 et 1.0
+  final Map<String, double> _projectProgress = {};
 
   @override
   void initState() {
@@ -69,10 +72,39 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
+  /// 🔄 Charge la progression réelle (depuis les tâches) pour chaque projet
+  Future<void> _loadProjectsProgress(List<ProjectModel> projects) async {
+    final taskService = TaskService();
+
+    final toLoad = <String>[];
+    for (final p in projects) {
+      if (p.id.isNotEmpty && !_projectProgress.containsKey(p.id)) {
+        toLoad.add(p.id);
+      }
+    }
+
+    for (final projectId in toLoad) {
+      try {
+        final stats = await taskService.getTaskStats(projectId);
+        final total = stats['total'] ?? 0;
+        final done = stats['done'] ?? 0;
+        final progress = total > 0 ? (done / total) : 0.0;
+        setState(() {
+          _projectProgress[projectId] = progress.clamp(0.0, 1.0);
+        });
+      } catch (e) {
+        print('Erreur chargement progress project $projectId: $e');
+        setState(() {
+          _projectProgress[projectId] = 0.0;
+        });
+      }
+    }
+  }
+
   /// 🖼️ Widget avatar avec photo de profil
   Widget _buildMemberAvatar(String? photoURL, {double size = 28}) {
-    final bool hasPhoto = photoURL != null && 
-                          photoURL.isNotEmpty && 
+    final bool hasPhoto = photoURL != null &&
+                          photoURL.isNotEmpty &&
                           File(photoURL).existsSync();
 
     if (!hasPhoto) {
@@ -108,6 +140,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
       _loadMembersPhotos(projects);
     }
 
+    // Charge la progression réelle pour les projets manquants dans le cache
+    if (projects.isNotEmpty && _projectProgress.length < projects.length) {
+      _loadProjectsProgress(projects);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
@@ -127,7 +164,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       color: Colors.black87,
                     ),
                   ),
-                  
+
                   Stack(
                     children: [
                       const Icon(
@@ -152,7 +189,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 ],
               ),
             ),
-            
+
             // Liste des projets
             Expanded(
               child: projectProvider.isLoading
@@ -200,7 +237,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                 final project = projects[index];
                                 final members = project.members;
                                 final projectColor = _parseColor(project.color);
-                                
+                                // Utilise la progression réelle (cache) si disponible
+                                final progress = _projectProgress[project.id] ?? (project.progress ?? 0.0);
+                                final progressPercent = (progress * 100).toInt();
+
                                 return GestureDetector(
                                   onTap: () {
                                     Navigator.push(
@@ -239,7 +279,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                             ),
                                           ),
                                         ),
-                                        
+
                                         Padding(
                                           padding: const EdgeInsets.all(20),
                                           child: Column(
@@ -270,9 +310,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                   ),
                                                 ],
                                               ),
-                                              
+
                                               const SizedBox(height: 8),
-                                              
+
                                               Text(
                                                 project.description ?? 'Aucune description',
                                                 style: TextStyle(
@@ -281,9 +321,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                   height: 1.4,
                                                 ),
                                               ),
-                                              
+
                                               const SizedBox(height: 16),
-                                              
+
                                               Row(
                                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                 children: [
@@ -302,7 +342,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                                 _membersPhotos[members[i]],
                                                                 size: 28,
                                                               ),
-                                                            
+
                                                             if (members.length > 3)
                                                               Container(
                                                                 width: 28,
@@ -324,30 +364,42 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                               ),
                                                           ],
                                                         ),
-                                                  
+
+                                                  // ✅ DATE D'ÉCHÉANCE (dueDate) au lieu de createdAt
                                                   Row(
                                                     children: [
                                                       Icon(
-                                                        Icons.calendar_today_outlined,
+                                                        project.dueDate != null
+                                                            ? Icons.event_available_outlined
+                                                            : Icons.event_busy_outlined,
                                                         size: 14,
-                                                        color: Colors.grey.shade500,
+                                                        color: project.dueDate != null
+                                                            ? Colors.grey.shade500
+                                                            : Colors.grey.shade400,
                                                       ),
                                                       const SizedBox(width: 6),
                                                       Text(
-                                                        dateFormat.format(project.createdAt),
+                                                        project.dueDate != null
+                                                            ? dateFormat.format(project.dueDate!)
+                                                            : 'Sans échéance',
                                                         style: TextStyle(
                                                           fontSize: 13,
-                                                          color: Colors.grey.shade600,
+                                                          color: project.dueDate != null
+                                                              ? Colors.grey.shade600
+                                                              : Colors.grey.shade400,
+                                                          fontStyle: project.dueDate != null
+                                                              ? FontStyle.normal
+                                                              : FontStyle.italic,
                                                         ),
                                                       ),
                                                     ],
                                                   ),
                                                 ],
                                               ),
-                                              
+
                                               const SizedBox(height: 16),
-                                              
-                                              // Barre de progression
+
+                                              // ✅ Barre de progression avec VRAIE valeur
                                               Container(
                                                 height: 6,
                                                 decoration: BoxDecoration(
@@ -356,7 +408,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                 ),
                                                 child: FractionallySizedBox(
                                                   alignment: Alignment.centerLeft,
-                                                  widthFactor: 0.0,
+                                                  widthFactor: progress.clamp(0.0, 1.0),
                                                   child: Container(
                                                     decoration: BoxDecoration(
                                                       color: projectColor ?? const Color(0xFF6B4EFF),
@@ -365,11 +417,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                                   ),
                                                 ),
                                               ),
-                                              
+
                                               const SizedBox(height: 10),
-                                              
+
+                                              // ✅ VRAI pourcentage de progression
                                               Text(
-                                                '0% complété',
+                                                '$progressPercent% complété',
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   color: Colors.grey.shade600,
@@ -386,19 +439,19 @@ class _ProjectsPageState extends State<ProjectsPage> {
                               },
                             ),
             ),
-            
+
             const SizedBox(height: 80),
           ],
         ),
       ),
-      
+
       floatingActionButton: GestureDetector(
         onTap: () async {
           final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const CreateProjectPage()),
           );
-          
+
           if (mounted && result == true) {
             context.read<ProjectProvider>().initProjectsStream();
           }
@@ -429,7 +482,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      
+
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -451,7 +504,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 _buildNavItem(Icons.folder_outlined, 'Projets', 1),
                 const SizedBox(width: 56),
                 _buildNavItem(Icons.people_outline, 'Équipe', 2),
-                _buildNavItem(Icons.person_outline, 'Profil', 3), 
+                _buildNavItem(Icons.person_outline, 'Profil', 3),
               ],
             ),
           ),
@@ -465,22 +518,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
     if (colorString == null || colorString.isEmpty) return null;
     try {
       String cleaned = colorString.trim().toUpperCase();
-      
+
       if (cleaned.startsWith('0X')) {
         cleaned = cleaned.substring(2);
       } else if (cleaned.startsWith('#')) {
         cleaned = cleaned.substring(1);
       }
-      
+
       if (cleaned.length == 6) {
         cleaned = 'FF' + cleaned;
       }
-      
+
       if (cleaned.length != 8) {
         print('Format couleur invalide: $colorString → cleaned=$cleaned');
         return const Color(0xFF6B4EFF);
       }
-      
+
       final intValue = int.parse(cleaned, radix: 16);
       return Color(intValue);
     } catch (e) {
@@ -492,7 +545,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   // ✅ MODIFIÉ: Supprimé "Partager", "Modifier" navigue vers EditProjectPage
   void _showProjectOptions(BuildContext context, ProjectModel project) {
     final projectProvider = context.read<ProjectProvider>();
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -516,13 +569,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // ✅ MODIFIER: Navigation vers EditProjectPage
                 ListTile(
                   leading: const Icon(Icons.edit_outlined, color: Color(0xFF6B4EFF)),
                   title: const Text('Modifier le projet'),
                   onTap: () {
-                    Navigator.pop(context); // Ferme le bottom sheet
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -531,11 +584,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     );
                   },
                 ),
-                
-                // ❌ SUPPRIMÉ: Option "Partager"
-                
+
                 const SizedBox(height: 8),
-                
+
                 // SUPPRIMER
                 ListTile(
                   leading: const Icon(Icons.delete_outline, color: Colors.red),
@@ -563,7 +614,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {

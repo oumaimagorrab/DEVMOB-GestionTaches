@@ -7,25 +7,22 @@ class ProjectProvider extends ChangeNotifier {
 
   List<ProjectModel> _projects = [];
   List<ProjectModel> _userProjects = [];
-  List<ProjectModel> _activeProjects = [];  // ✅ NOUVEAU: projets actifs seulement
+  List<ProjectModel> _activeProjects = [];
   ProjectModel? _selectedProject;
   bool _isLoading = false;
   String? _error;
 
-  // Getters
   List<ProjectModel> get projects => _projects;
   List<ProjectModel> get userProjects => _userProjects;
-  List<ProjectModel> get activeProjects => _activeProjects;  // ✅ NOUVEAU
+  List<ProjectModel> get activeProjects => _activeProjects;
   ProjectModel? get selectedProject => _selectedProject;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Stream subscription
   Stream<List<ProjectModel>>? _projectsStream;
   Stream<List<ProjectModel>>? _userProjectsStream;
-  Stream<List<ProjectModel>>? _activeProjectsStream;  // ✅ NOUVEAU
+  Stream<List<ProjectModel>>? _activeProjectsStream;
 
-  // Initialiser les streams
   void initProjectsStream() {
     _projectsStream = _projectService.getProjects();
     _projectsStream?.listen((projects) {
@@ -34,7 +31,6 @@ class ProjectProvider extends ChangeNotifier {
     });
   }
 
-  // ✅ NOUVELLE MÉTHODE: Stream des projets actifs seulement
   void initActiveProjectsStream() {
     _activeProjectsStream = _projectService.getActiveProjects();
     _activeProjectsStream?.listen((projects) {
@@ -52,14 +48,15 @@ class ProjectProvider extends ChangeNotifier {
     });
   }
 
-  // ✅ CRÉER un projet avec status
+  // ✅ CRÉER avec dueDate
   Future<ProjectModel?> createProject({
     required String title,
     String? description,
     required String createdBy,
     List<String> members = const [],
     String? color,
-    String status = 'active',  // ✅ AJOUTÉ
+    String status = 'active',
+    DateTime? dueDate,  // ← AJOUTÉ
   }) async {
     _setLoading(true);
     _clearError();
@@ -71,10 +68,10 @@ class ProjectProvider extends ChangeNotifier {
         createdBy: createdBy,
         members: members,
         color: color,
-        status: status,  // ✅ AJOUTÉ
+        status: status,
+        dueDate: dueDate,  // ← AJOUTÉ
       );
 
-      // Ajouter le créateur comme membre si pas déjà inclus
       if (!project.members.contains(createdBy)) {
         await _projectService.addMember(project.id, createdBy);
       }
@@ -88,7 +85,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // Sélectionner un projet
   void selectProject(ProjectModel project) {
     _selectedProject = project;
     notifyListeners();
@@ -99,14 +95,15 @@ class ProjectProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ METTRE À JOUR un projet (avec status optionnel)
+  // ✅ METTRE À JOUR avec dueDate
   Future<bool> updateProject(
     String projectId, {
     String? title,
     String? description,
     List<String>? members,
     String? color,
-    String? status,  // ✅ AJOUTÉ
+    String? status,
+    DateTime? dueDate,  // ← AJOUTÉ
   }) async {
     _setLoading(true);
     _clearError();
@@ -118,7 +115,8 @@ class ProjectProvider extends ChangeNotifier {
         description: description,
         members: members,
         color: color,
-        status: status,  // ✅ AJOUTÉ
+        status: status,
+        dueDate: dueDate,  // ← AJOUTÉ
       );
       _setLoading(false);
       return true;
@@ -129,7 +127,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ NOUVELLE MÉTHODE: Changer le status d'un projet
   Future<bool> updateProjectStatus(String projectId, String status) async {
     _setLoading(true);
     _clearError();
@@ -146,22 +143,18 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ NOUVELLE MÉTHODE: Archiver un projet
   Future<bool> archiveProject(String projectId) async {
     return updateProjectStatus(projectId, 'archived');
   }
 
-  // ✅ NOUVELLE MÉTHODE: Marquer comme terminé
   Future<bool> completeProject(String projectId) async {
     return updateProjectStatus(projectId, 'completed');
   }
 
-  // ✅ NOUVELLE MÉTHODE: Réactiver un projet
   Future<bool> reactivateProject(String projectId) async {
     return updateProjectStatus(projectId, 'active');
   }
 
-  // Ajouter un membre
   Future<bool> addMember(String projectId, String userId) async {
     _setLoading(true);
     _clearError();
@@ -177,7 +170,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // Retirer un membre
   Future<bool> removeMember(String projectId, String userId) async {
     _setLoading(true);
     _clearError();
@@ -193,7 +185,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // Supprimer un projet
   Future<bool> deleteProject(String projectId) async {
     _setLoading(true);
     _clearError();
@@ -213,7 +204,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // Rechercher des projets
   Future<void> searchProjects(String query) async {
     _setLoading(true);
     _clearError();
@@ -229,7 +219,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // Helpers
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -249,7 +238,6 @@ class ProjectProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Obtenir un projet par ID depuis la liste locale
   ProjectModel? getProjectById(String id) {
     try {
       return _projects.firstWhere((p) => p.id == id);
@@ -258,7 +246,6 @@ class ProjectProvider extends ChangeNotifier {
     }
   }
 
-  // Vérifier si un utilisateur est membre d'un projet
   bool isUserMember(String projectId, String userId) {
     final project = getProjectById(projectId);
     return project?.members.contains(userId) ?? false;
@@ -266,7 +253,6 @@ class ProjectProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Nettoyer les streams si nécessaire
     super.dispose();
   }
 

@@ -202,7 +202,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
     );
   }
 
-  // ✅ CORRIGÉ: Utilise le hex pré-défini au lieu de .value.toRadixString(16)
   Future<void> _createProject() async {
     if (_nameController.text.trim().isEmpty) {
       _showSnackBar('Veuillez entrer un nom de projet');
@@ -221,7 +220,6 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
         .map((m) => m['id'] as String)
         .toList();
 
-    // ✅ FIX: Utilise la valeur hex correcte du Map
     final selectedColorHex = projectColors[_selectedColorIndex]['hex'] as String;
 
     final project = await provider.createProject(
@@ -231,8 +229,9 @@ class _CreateProjectPageState extends State<CreateProjectPage> {
           : _descriptionController.text.trim(),
       createdBy: currentUserId,
       members: memberIds,
-      color: selectedColorHex,  // ✅ Hex correct : "FF5B5BD6" etc.
+      color: selectedColorHex,
       status: 'active',
+      dueDate: _selectedDate,  // ← AJOUTÉ : passe la date d'échéance
     );
 
     if (project != null) {

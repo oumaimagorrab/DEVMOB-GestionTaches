@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gestiontaches/models/task.dart';
+import 'package:gestiontaches/services/project_service.dart';
 
 class TaskService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -35,16 +36,20 @@ class TaskService {
         dueDate: dueDate,
       );
 
-      print('💾 Création tâche: \$title (projectId: \$projectId)');
-      print('📊 Task toJson: \${task.toJson()}');
+      print('💾 Création tâche: $title (projectId: $projectId)');
+      print('📊 Task toJson: ${task.toJson()}');
 
       await docRef.set(task.toJson());
 
-      print('✅ Tâche créée avec ID: \${docRef.id}');
+      print('✅ Tâche créée avec ID: ${docRef.id}');
+      
+      // ✅ Met à jour la progression du projet après création
+      await ProjectService().updateProjectProgress(projectId);
+      
       return task;
     } catch (e) {
-      print('❌ Erreur création: \$e');
-      throw Exception('Erreur création tâche: \$e');
+      print('❌ Erreur création: $e');
+      throw Exception('Erreur création tâche: $e');
     }
   }
 
@@ -56,25 +61,25 @@ class TaskService {
         .snapshots()
         .map((snapshot) {
           try {
-            print('📦 Snapshot reçu: \${snapshot.docs.length} documents');
+            print('📦 Snapshot reçu: ${snapshot.docs.length} documents');
 
             final tasks = <TaskModel>[];
             for (var doc in snapshot.docs) {
               try {
                 final data = {...doc.data(), 'id': doc.id};
-                print('📄 Doc \${doc.id}: \$data');
+                print('📄 Doc ${doc.id}: $data');
                 final task = TaskModel.fromJson(data);
                 tasks.add(task);
               } catch (e) {
-                print('❌ Erreur parsing doc \${doc.id}: \$e');
+                print('❌ Erreur parsing doc ${doc.id}: $e');
               }
             }
 
-            print('✅ \${tasks.length} tâches parsées');
+            print('✅ ${tasks.length} tâches parsées');
             tasks.sort((a, b) => b.createdAt.compareTo(a.createdAt));
             return tasks;
           } catch (e) {
-            print('❌ Erreur map stream: \$e');
+            print('❌ Erreur map stream: $e');
             return [];
           }
         });
@@ -110,11 +115,11 @@ class TaskService {
       }
       return null;
     } catch (e) {
-      throw Exception('Erreur récupération tâche: \$e');
+      throw Exception('Erreur récupération tâche: $e');
     }
   }
 
-  // ✅ CORRIGÉ: Mettre à jour le statut avec completedAt
+  // ✅ CORRIGÉ: Mettre à jour le statut avec completedAt + progression projet
   Future<void> updateStatus(String taskId, String newStatus) async {
     try {
       final isCompleted = newStatus == 'done';
@@ -131,8 +136,15 @@ class TaskService {
       }
 
       await _firestore.collection(_collection).doc(taskId).update(updates);
+      
+      // ✅ Met à jour la progression du projet
+      final taskDoc = await _firestore.collection(_collection).doc(taskId).get();
+      final projectId = taskDoc.data()?['projectId'] as String?;
+      if (projectId != null) {
+        await ProjectService().updateProjectProgress(projectId);
+      }
     } catch (e) {
-      throw Exception('Erreur mise à jour statut: \$e');
+      throw Exception('Erreur mise à jour statut: $e');
     }
   }
 
@@ -143,11 +155,11 @@ class TaskService {
         'assigneeId': assigneeId,
       });
     } catch (e) {
-      throw Exception('Erreur assignation: \$e');
+      throw Exception('Erreur assignation: $e');
     }
   }
 
-  // ✅ CORRIGÉ: Mettre à jour une tâche avec completedAt
+  // ✅ CORRIGÉ: Mettre à jour une tâche avec completedAt + progression projet
   Future<void> updateTask(
     String taskId, {
     String? title,
@@ -180,8 +192,17 @@ class TaskService {
       if (updates.isNotEmpty) {
         await _firestore.collection(_collection).doc(taskId).update(updates);
       }
+      
+      // ✅ Met à jour la progression du projet si le status a changé
+      if (status != null) {
+        final taskDoc = await _firestore.collection(_collection).doc(taskId).get();
+        final projectId = taskDoc.data()?['projectId'] as String?;
+        if (projectId != null) {
+          await ProjectService().updateProjectProgress(projectId);
+        }
+      }
     } catch (e) {
-      throw Exception('Erreur mise à jour: \$e');
+      throw Exception('Erreur mise à jour: $e');
     }
   }
 
@@ -192,16 +213,25 @@ class TaskService {
         'comments': FieldValue.arrayUnion([comment]),
       });
     } catch (e) {
-      throw Exception('Erreur ajout commentaire: \$e');
+      throw Exception('Erreur ajout commentaire: $e');
     }
   }
 
-  // Supprimer une tâche
+  // ✅ CORRIGÉ: Supprimer une tâche + mettre à jour progression
   Future<void> deleteTask(String taskId) async {
     try {
+      // Récupère le projectId avant suppression
+      final taskDoc = await _firestore.collection(_collection).doc(taskId).get();
+      final projectId = taskDoc.data()?['projectId'] as String?;
+      
       await _firestore.collection(_collection).doc(taskId).delete();
+      
+      // ✅ Met à jour la progression du projet après suppression
+      if (projectId != null) {
+        await ProjectService().updateProjectProgress(projectId);
+      }
     } catch (e) {
-      throw Exception('Erreur suppression: \$e');
+      throw Exception('Erreur suppression: $e');
     }
   }
 
@@ -224,7 +254,7 @@ class TaskService {
         'done': tasks.where((t) => t.status == 'done').length,
       };
     } catch (e) {
-      throw Exception('Erreur stats: \$e');
+      throw Exception('Erreur stats: $e');
     }
   }
 }
