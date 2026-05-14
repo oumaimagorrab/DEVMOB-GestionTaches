@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/project.dart';
 import 'package:gestiontaches/services/task_service.dart';
+import 'package:gestiontaches/services/notification_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProjectDetailPage2 extends StatefulWidget {
   final ProjectModel project;
@@ -109,7 +111,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage2> {
     return context.read<AppAuthProvider>().user?.id;
   }
 
-  // 🔥 BASCULE LE STATUT D'UNE TÂCHE
+  // 🔥 BASCULE LE STATUT D'UNE TÂCHE + ENVOI NOTIFICATION
   Future<void> _toggleTaskStatus(String taskId, String currentStatus) async {
     String newStatus;
 
@@ -139,10 +141,70 @@ class _ProjectDetailPageState extends State<ProjectDetailPage2> {
 
       await _firestore.collection('tasks').doc(taskId).update(updateData);
 
-      // ✅ Utilisation directe des méthodes déclarées plus haut
+      // ✅ ENVOI NOTIFICATION À L'ADMIN si tâche terminée
+      if (newStatus == 'done') {
+        await _sendTaskCompletedNotification(taskId);
+      }
+
       _showSuccess(newStatus == 'done' ? 'Tâche terminée !' : 'Tâche en cours');
     } catch (e) {
       _showError('Erreur: $e');
+    }
+  }
+
+  /// 🔔 Envoie une notification à l'admin quand une tâche est terminée
+  Future<void> _sendTaskCompletedNotification(String taskId) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Récupère les infos du collaborateur
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      final senderName = userDoc.data()?['name'] ?? 
+                        userDoc.data()?['displayName'] ?? 
+                        'Collaborateur';
+
+      // Récupère les infos de la tâche
+      final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
+      final taskData = taskDoc.data();
+      if (taskData == null) return;
+
+      final taskName = taskData['title'] ?? 'Tâche sans titre';
+      final projectId = taskData['projectId'] as String?;
+
+      // Récupère le nom du projet
+      String? projectName;
+      if (projectId != null) {
+        final projectDoc = await _firestore.collection('projects').doc(projectId).get();
+        projectName = projectDoc.data()?['title'] as String?;
+      }
+
+      // Trouve l'admin
+      final notificationService = NotificationService();
+      final adminId = await notificationService.getAdminId();
+
+      if (adminId == null) {
+        print('⚠️ Aucun admin trouvé');
+        return;
+      }
+
+      // Crée la notification
+      await notificationService.createNotification(
+        userId: adminId,           // Destinataire = admin
+        senderId: currentUser.uid, // Expéditeur = collaborateur
+        senderName: senderName,
+        type: 'task_completed',
+        title: '✅ Tâche terminée',
+        message: '$senderName a terminé la tâche "$taskName"${projectName != null ? ' dans le projet "$projectName"' : ''}',
+        projectId: projectId,
+        projectName: projectName,
+        taskId: taskId,
+        taskName: taskName,
+      );
+
+      print('✅ Notification envoyée à l\'admin $adminId');
+    } catch (e) {
+      print('❌ Erreur envoi notification: $e');
     }
   }
 

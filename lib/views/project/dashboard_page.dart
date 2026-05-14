@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'create_project_page.dart'; 
 import 'package:gestiontaches/views/profile/user_profile_page.dart'; 
+import 'package:gestiontaches/views/notifications/notifications_page.dart'; // ✅ AJOUTÉ
+import 'package:gestiontaches/models/project.dart';
 
 class AdminDashboardPage extends StatefulWidget {
 
@@ -22,6 +25,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   int _activeMembers = 0;
   bool _isLoading = true;
   List<Map<String, dynamic>> _recentMembers = [];
+  List<Map<String, dynamic>> _recentProjects = []; // ✅ Projets récents avec couleur
   String? _currentUserId;
 
   String _displayName = "Utilisateur";
@@ -86,11 +90,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
       print('📅 Aujourd\'hui (minuit): $today');
 
-      // 1. Projets actifs
+      // 1. Projets actifs avec couleur et progression
       final projectsSnapshot = await firestore
           .collection('projects')
           .where('status', whereIn: ['active', 'en_cours'])
+          .orderBy('createdAt', descending: true)
+          .limit(10)
           .get();
+
+      final recentProjects = projectsSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'title': data['title'] ?? 'Sans titre',
+          'description': data['description'] ?? '',
+          'color': data['color'] ?? 'FF6B4EFF',
+          'progress': (data['progress'] as num?)?.toDouble() ?? 0.0,
+          'dueDate': data['dueDate'] != null 
+              ? (data['dueDate'] as Timestamp).toDate() 
+              : null,
+          'members': List<String>.from(data['members'] ?? []),
+        };
+      }).toList();
 
       // 2. Tâches terminées cette semaine
       final doneTasksSnapshot = await firestore
@@ -105,12 +126,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           .where('completedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekAgo))
           .get();
 
-      // 3. ✅ CORRIGÉ : Tâches en retard — dueDate < aujourd'hui (minuit)
-      final lateTasksSnapshot = await firestore
+      // 3. ✅ CORRIGÉ : Tâches en retard — filtre côté client
+      final allActiveTasksSnapshot = await firestore
           .collection('tasks')
-          .where('dueDate', isLessThan: Timestamp.fromDate(today))
           .where('status', whereIn: ['todo', 'in_progress', 'pending'])
           .get();
+
+      final lateTasks = allActiveTasksSnapshot.docs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final dueDate = (data['dueDate'] as Timestamp?)?.toDate();
+        if (dueDate == null) return false;
+        return dueDate.isBefore(today);
+      }).toList();
 
       // 4. Membres actifs
       final membersSnapshot = await firestore.collection('users').get();
@@ -122,11 +149,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         return role != 'admin' && !isAdmin;
       }).toList();
 
-      // 5. Membres récents (sans photoURL)
+      // 5. ✅ Membres récents AVEC photoURL
       final recentMembersSnapshot = await firestore
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .limit(5)
+          .limit(10)
           .get();
 
       final recentMembers = recentMembersSnapshot.docs.where((doc) {
@@ -137,29 +164,76 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       }).map((doc) => {
         'id': doc.id,
         'name': doc.data()['displayName'] ?? doc.data()['name'] ?? 'Utilisateur',
-        // 🚫 photoURL supprimé — plus d'avatars
+        'email': doc.data()['email'] ?? '',
+        'photoURL': doc.data()['photoURL'] ?? '', // ✅ AJOUTÉ
+        'role': doc.data()['role'] ?? 'collaborateur',
       }).toList();
 
       setState(() {
         _activeProjects = projectsSnapshot.docs.length;
         _completedTasks = doneTasksSnapshot.docs.length + completedTasksSnapshot.docs.length;
-        _lateTasks = lateTasksSnapshot.docs.length;
+        _lateTasks = lateTasks.length;
         _activeMembers = activeMembers.length;
-        _recentMembers = recentMembers.take(3).toList();
+        _recentMembers = recentMembers.take(5).toList();
+        _recentProjects = recentProjects; // ✅ Projets avec couleur
         _isLoading = false;
       });
 
       // Debug
       print('📊 Stats: $_activeProjects projets, $_completedTasks tâches finies, $_lateTasks retard, $_activeMembers membres');
-      for (var doc in lateTasksSnapshot.docs) {
-        final d = doc.data() as Map<String, dynamic>;
-        final due = (d['dueDate'] as Timestamp?)?.toDate();
-        print('🚨 Tâche en retard: ${d['title']} | dueDate: $due');
+      print('🎨 Projets récents: ${_recentProjects.length}');
+      for (var p in _recentProjects) {
+        print('   📁 ${p['title']} | couleur: ${p['color']} | progress: ${p['progress']}');
       }
 
     } catch (e) {
       print('Erreur chargement dashboard: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  /// 🖼️ Widget avatar avec photo de profil locale
+  Widget _buildAvatar(String? photoURL, {double size = 40}) {
+    final bool hasPhoto = photoURL != null && 
+                          photoURL.isNotEmpty && 
+                          File(photoURL).existsSync();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey.shade200,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: hasPhoto
+          ? ClipOval(
+              child: Image.file(
+                File(photoURL),
+                fit: BoxFit.cover,
+                width: size,
+                height: size,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400);
+                },
+              ),
+            )
+          : Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400),
+    );
+  }
+
+  /// 🎨 Parse la couleur du projet
+  Color _parseColor(String? colorString) {
+    if (colorString == null || colorString.isEmpty) return const Color(0xFF6B4EFF);
+    try {
+      String cleaned = colorString.trim().toUpperCase();
+      if (cleaned.startsWith('0X')) cleaned = cleaned.substring(2);
+      else if (cleaned.startsWith('#')) cleaned = cleaned.substring(1);
+      if (cleaned.length == 6) cleaned = 'FF' + cleaned;
+      if (cleaned.length != 8) return const Color(0xFF6B4EFF);
+      return Color(int.parse(cleaned, radix: 16));
+    } catch (e) {
+      return const Color(0xFF6B4EFF);
     }
   }
 
@@ -173,29 +247,83 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       body: SafeArea(
         child: Column(
           children: [
+            // ✅ HEADER AVEC AVATAR + NOTIFICATION CLIQUABLE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // 🖼️ Avatar de l'utilisateur connecté
+                  FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(_currentUserId)
+                        .get(),
+                    builder: (context, snapshot) {
+                      String? photoURL;
+                      if (snapshot.hasData && snapshot.data!.exists) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>?;
+                        photoURL = data?['photoURL'] as String?;
+                      }
+                      return _buildAvatar(photoURL, size: 44);
+                    },
+                  ),
+
+                  // 🔔 NOTIFICATION CLIQUABLE AVEC BADGE
                   Stack(
                     children: [
-                      const Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.black87,
-                        size: 24,
-                      ),
-                      Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
+                      // ✅ IconButton cliquable
+                      IconButton(
+                        icon: const Icon(
+                          Icons.notifications_outlined, 
+                          color: Colors.black87,
+                          size: 24,
                         ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationsPage(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // 🔥 BADGE ROUGE avec compteur de notifs non lues
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('notifications')
+                            .where('userId', isEqualTo: _currentUserId)
+                            .where('read', isEqualTo: false)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+                          if (count == 0) return const SizedBox.shrink();
+
+                          return Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Container(
+                              width: count > 9 ? 20 : 16,
+                              height: 16,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  count > 9 ? '9+' : '$count',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -246,53 +374,59 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ),
                             )
-                          : GridView.count(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 0.85,
+                          : Column(
                               children: [
-                                _buildStatCard(
-                                  icon: Icons.folder_outlined,
-                                  iconColor: const Color(0xFF6B4EFF),
-                                  iconBgColor: const Color(0xFF6B4EFF).withOpacity(0.1),
-                                  value: _activeProjects.toString(),
-                                  label: 'Projets actifs',
-                                  footer: '+2 ce mois',
-                                  footerColor: Colors.green,
+                                // ✅ STATS CARDS
+                                GridView.count(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 0.85,
+                                  children: [
+                                    _buildStatCard(
+                                      icon: Icons.folder_outlined,
+                                      iconColor: const Color(0xFF6B4EFF),
+                                      iconBgColor: const Color(0xFF6B4EFF).withOpacity(0.1),
+                                      value: _activeProjects.toString(),
+                                      label: 'Projets actifs',
+                                      footer: '+2 ce mois',
+                                      footerColor: Colors.green,
+                                    ),
+
+                                    _buildStatCard(
+                                      icon: Icons.check_circle_outline,
+                                      iconColor: Colors.green,
+                                      iconBgColor: Colors.green.withOpacity(0.1),
+                                      value: _completedTasks.toString(),
+                                      label: 'Tâches terminées',
+                                      footer: 'cette semaine',
+                                      footerColor: Colors.grey.shade600,
+                                      showProgressBar: true,
+                                      progressColor: Colors.green,
+                                    ),
+
+                                    _buildStatCard(
+                                      icon: Icons.error_outline,
+                                      iconColor: Colors.red,
+                                      iconBgColor: Colors.red.withOpacity(0.1),
+                                      value: _lateTasks.toString(),
+                                      label: 'Tâches en retard',
+                                      showBadge: _lateTasks > 0,
+                                    ),
+
+                                    _buildStatCard(
+                                      icon: Icons.people_outline,
+                                      iconColor: Colors.orange,
+                                      iconBgColor: Colors.orange.withOpacity(0.1),
+                                      value: _activeMembers.toString(),
+                                      label: 'Membres actifs',
+                                    ),
+                                  ],
                                 ),
 
-                                _buildStatCard(
-                                  icon: Icons.check_circle_outline,
-                                  iconColor: Colors.green,
-                                  iconBgColor: Colors.green.withOpacity(0.1),
-                                  value: _completedTasks.toString(),
-                                  label: 'Tâches terminées',
-                                  footer: 'cette semaine',
-                                  footerColor: Colors.grey.shade600,
-                                  showProgressBar: true,
-                                  progressColor: Colors.green,
-                                ),
-
-                                _buildStatCard(
-                                  icon: Icons.error_outline,
-                                  iconColor: Colors.red,
-                                  iconBgColor: Colors.red.withOpacity(0.1),
-                                  value: _lateTasks.toString(),
-                                  label: 'Tâches en retard',
-                                  showBadge: _lateTasks > 0,
-                                ),
-
-                                _buildStatCard(
-                                  icon: Icons.people_outline,
-                                  iconColor: Colors.orange,
-                                  iconBgColor: Colors.orange.withOpacity(0.1),
-                                  value: _activeMembers.toString(),
-                                  label: 'Membres actifs',
-                                  // 🚫 showAvatars supprimé
-                                ),
+                                const SizedBox(height: 24),
                               ],
                             ),
 
@@ -367,6 +501,65 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
         ),
       ),
+    );
+  }
+
+  /// 🖼️ Avatars des membres d'un projet (stackés)
+  Widget _buildProjectMemberAvatars(List<String> memberIds) {
+    if (memberIds.isEmpty) return const SizedBox.shrink();
+
+    return FutureBuilder<List<DocumentSnapshot>>(
+      future: Future.wait(
+        memberIds.take(3).map((id) => 
+          FirebaseFirestore.instance.collection('users').doc(id).get()
+        ),
+      ),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox(width: 24, height: 24);
+
+        final photos = snapshot.data!
+            .where((doc) => doc.exists)
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>?;
+              return data?['photoURL'] as String?;
+            })
+            .where((url) => url != null && url.isNotEmpty)
+            .cast<String>()
+            .toList();
+
+        return Row(
+          children: [
+            for (int i = 0; i < photos.length && i < 3; i++)
+              Transform.translate(
+                offset: Offset(i * -8.0, 0),
+                child: _buildAvatar(photos[i], size: 24),
+              ),
+            if (memberIds.length > 3)
+              Transform.translate(
+                offset: Offset(photos.length * -8.0, 0),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '+${memberIds.length - 3}',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
