@@ -597,17 +597,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: _changeAssignee,
-                              child: Text(
-                                'Modifier',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: const Color(0xFF6B4EFF),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
+                            const SizedBox.shrink(),
                           ],
                         ),
                       ],

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/project.dart';
+import 'package:gestiontaches/services/task_service.dart';
 
 class ProjectDetailPage2 extends StatefulWidget {
   final ProjectModel project;
@@ -31,10 +32,22 @@ class _ProjectDetailPageState extends State<ProjectDetailPage2> {
     'low': 'Low',
   };
 
+  // Progression (valeur fractionnaire 0.0 - 1.0)
+  double _progress = 0.0;
+
   @override
   void initState() {
     super.initState();
     _loadCreatorName();
+    // initialise la progression depuis le modèle (normalise si nécessaire)
+    double initial = widget.project.progress ?? 0.0;
+    if (initial > 1.0) {
+      // stocké en % (0-100) — convertir en fraction
+      initial = (initial / 100.0);
+    }
+    _progress = initial.clamp(0.0, 1.0);
+    // charge la progression réelle depuis les tâches
+    _loadProgress(widget.project.id);
   }
 
   // ─── SNACKBAR HELPERS (déclarés avant usage) ───
@@ -146,12 +159,25 @@ class _ProjectDetailPageState extends State<ProjectDetailPage2> {
     }
   }
 
+  /// 🔄 Charge la progression réelle pour ce projet depuis TaskService
+  Future<void> _loadProgress(String projectId) async {
+    try {
+      final stats = await TaskService().getTaskStats(projectId);
+      final total = stats['total'] ?? 0;
+      final done = stats['done'] ?? 0;
+      final progress = total > 0 ? (done / total) : 0.0;
+      if (mounted) setState(() => _progress = progress.clamp(0.0, 1.0));
+    } catch (e) {
+      print('Erreur chargement progression projet $projectId: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final userId = _getCurrentUserId();
     final project = widget.project;
     final Color progressColor = _getProgressColor(project.status);
-    final double progress = project.progress ?? 0.0;
+    final double progress = _progress;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -206,7 +232,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage2> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: LinearProgressIndicator(
-                  value: progress / 100,
+                  value: progress,
                   backgroundColor: Colors.grey.shade200,
                   valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                   minHeight: 8,
@@ -215,7 +241,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage2> {
               const SizedBox(height: 6),
               Center(
                 child: Text(
-                  '${progress.toInt()}%',
+                  '${(progress * 100).toInt()}%',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

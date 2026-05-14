@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +6,8 @@ import '../../providers/auth_provider.dart';
 import '../../models/project.dart';
 import 'package:gestiontaches/views/profile/user_profile_page.dart';
 import 'package:gestiontaches/views/project/project_detail_page2.dart';
-import 'package:gestiontaches/views/notifications/notifications_page.dart'; // ✅ AJOUTÉ
+import 'package:gestiontaches/views/notifications/notifications_page.dart';
+import 'package:gestiontaches/services/task_service.dart';
 
 class CollaboratorProjectsPage extends StatefulWidget {
   const CollaboratorProjectsPage({super.key});
@@ -17,6 +19,11 @@ class CollaboratorProjectsPage extends StatefulWidget {
 class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   int _currentIndex = 0;
+
+  // Cache des photos de profil : Map<userId, photoURL>
+  final Map<String, String?> _membersPhotos = {};
+  // Cache de progression par projectId : valeur entre 0.0 et 1.0
+  final Map<String, double> _projectProgress = {};
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +58,6 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
               IconButton(
                 icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
                 onPressed: () {
-                  // ✅ NAVIGATION VERS LA PAGE NOTIFICATIONS
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -155,8 +161,13 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
           }
 
           final List<ProjectModel> projects = snapshot.data!.docs.map((doc) {
-            return ProjectModel.fromJson(doc.data() as Map<String, dynamic>);
+            return ProjectModel.fromJson({...doc.data() as Map<String, dynamic>, 'id': doc.id});
           }).toList();
+
+          // Charge les photos des membres
+          _loadMembersPhotos(projects);
+          // Charge la progression réelle pour ces projets
+          _loadProjectsProgress(projects);
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -206,9 +217,112 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
     );
   }
 
+  /// 🔄 Charge les photos de profil des membres
+  Future<void> _loadMembersPhotos(List<ProjectModel> projects) async {
+    final Set<String> allMemberIds = {};
+    for (final project in projects) {
+      for (final memberId in project.members) {
+        allMemberIds.add(memberId);
+      }
+    }
+
+    for (final memberId in allMemberIds) {
+      if (_membersPhotos.containsKey(memberId)) continue;
+
+      try {
+        final doc = await _firestore.collection('users').doc(memberId).get();
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>?;
+          _membersPhotos[memberId] = data?['photoURL'] as String?;
+        } else {
+          _membersPhotos[memberId] = null;
+        }
+      } catch (e) {
+        print('Erreur chargement photo membre $memberId: $e');
+        _membersPhotos[memberId] = null;
+      }
+    }
+  }
+
+  /// 🔄 Charge la progression réelle (depuis les tâches) pour chaque projet
+  Future<void> _loadProjectsProgress(List<ProjectModel> projects) async {
+    final taskService = TaskService();
+
+    final toLoad = <String>[];
+    for (final p in projects) {
+      if (p.id.isNotEmpty && !_projectProgress.containsKey(p.id)) {
+        toLoad.add(p.id);
+      }
+    }
+
+    for (final projectId in toLoad) {
+      try {
+        final stats = await taskService.getTaskStats(projectId);
+        final total = stats['total'] ?? 0;
+        final done = stats['done'] ?? 0;
+        final progress = total > 0 ? (done / total) : 0.0;
+        setState(() {
+          _projectProgress[projectId] = progress.clamp(0.0, 1.0);
+        });
+      } catch (e) {
+        print('Erreur chargement progress project $projectId: $e');
+        setState(() {
+          _projectProgress[projectId] = 0.0;
+        });
+      }
+    }
+  }
+
+  /// 🖼️ Widget avatar avec photo de profil locale
+  Widget _buildAvatar(String? photoURL, {double size = 32}) {
+    final bool hasPhoto = photoURL != null &&
+                          photoURL.isNotEmpty &&
+                          File(photoURL).existsSync();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey.shade200,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: hasPhoto
+          ? ClipOval(
+              child: Image.file(
+                File(photoURL),
+                fit: BoxFit.cover,
+                width: size,
+                height: size,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400);
+                },
+              ),
+            )
+          : Icon(Icons.person, size: size * 0.5, color: Colors.grey.shade400),
+    );
+  }
+
+  /// 🎨 Parse la couleur du projet depuis Firestore
+  Color? _parseProjectColor(String? colorString) {
+    if (colorString == null || colorString.isEmpty) return null;
+    try {
+      String cleaned = colorString.trim().toUpperCase();
+      if (cleaned.startsWith('0X')) cleaned = cleaned.substring(2);
+      else if (cleaned.startsWith('#')) cleaned = cleaned.substring(1);
+      if (cleaned.length == 6) cleaned = 'FF' + cleaned;
+      if (cleaned.length != 8) return const Color(0xFF5B5BD6);
+      return Color(int.parse(cleaned, radix: 16));
+    } catch (e) {
+      print('Erreur parsing couleur "$colorString": $e');
+      return const Color(0xFF5B5BD6);
+    }
+  }
+
   Widget _buildProjectCard(ProjectModel project) {
-    final Color progressColor = _getProgressColor(project.status);
-    final double progress = project.progress ?? 0.0;
+    final Color projectColor = _parseProjectColor(project.color) ?? const Color(0xFF5B5BD6);
+    final double progress = _projectProgress[project.id] ?? (project.progress ?? 0.0);
+    final int progressPercent = (progress * 100).toInt();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -229,10 +343,11 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
         },
         child: Column(
           children: [
+            // ✅ Barre de couleur du projet en haut
             Container(
               height: 4,
               decoration: BoxDecoration(
-                color: progressColor,
+                color: projectColor,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
@@ -256,11 +371,8 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                           ),
                         ),
                       ),
-                      Icon(
-                        Icons.more_vert,
-                        color: Colors.grey.shade400,
-                        size: 20,
-                      ),
+                      // Suppression des 3 points — espace réservé
+                      const SizedBox.shrink(),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -278,20 +390,34 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // ✅ Avatars des membres avec vraies photos
                       _buildMemberAvatars(project.members),
+
+                      // ✅ Date d'échéance au lieu de date de création
                       Row(
                         children: [
                           Icon(
-                            Icons.calendar_today_outlined,
+                            project.dueDate != null
+                                ? Icons.event_available_outlined
+                                : Icons.event_busy_outlined,
                             size: 14,
-                            color: Colors.grey.shade500,
+                            color: project.dueDate != null
+                                ? Colors.grey.shade500
+                                : Colors.grey.shade400,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            _formatDate(project.createdAt),
+                            project.dueDate != null
+                                ? _formatDate(project.dueDate!)
+                                : 'Sans échéance',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade500,
+                              color: project.dueDate != null
+                                  ? Colors.grey.shade500
+                                  : Colors.grey.shade400,
+                              fontStyle: project.dueDate != null
+                                  ? FontStyle.normal
+                                  : FontStyle.italic,
                             ),
                           ),
                         ],
@@ -299,18 +425,30 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress / 100,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                      minHeight: 6,
+
+                  // ✅ Barre de progression avec VRAIE valeur
+                  Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress.clamp(0.0, 1.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: projectColor,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
+
+                  // ✅ VRAI pourcentage de progression
                   Text(
-                    '${progress.toInt()}% complété',
+                    '$progressPercent% complété',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -326,19 +464,7 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
     );
   }
 
-  Color _getProgressColor(String status) {
-    switch (status) {
-      case 'en_cours':
-        return const Color(0xFF5B5BD6);
-      case 'termine':
-        return Colors.green;
-      case 'en_attente':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
-  }
-
+  /// 🖼️ Avatars des membres avec photos réelles (stackés)
   Widget _buildMemberAvatars(List<String>? members) {
     if (members == null || members.isEmpty) {
       return const SizedBox.shrink();
@@ -354,18 +480,12 @@ class _CollaboratorProjectsPageState extends State<CollaboratorProjectsPage> {
       child: Stack(
         children: displayMembers.asMap().entries.map((entry) {
           final index = entry.key;
+          final memberId = entry.value;
+          final photoURL = _membersPhotos[memberId];
+
           return Positioned(
             left: index * overlap,
-            child: Container(
-              width: avatarSize,
-              height: avatarSize,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: Icon(Icons.person, size: 16, color: Colors.grey.shade500),
-            ),
+            child: _buildAvatar(photoURL, size: avatarSize),
           );
         }).toList(),
       ),
